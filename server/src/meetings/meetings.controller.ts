@@ -12,6 +12,7 @@ import {
 import { FileInterceptor } from '@nestjs/platform-express';
 import { MeetingsService } from './meetings.service';
 import { MeetingResponse } from './interfaces/meeting-response.interface';
+import type { Express } from 'express';
 
 /**
  * MeetingsController

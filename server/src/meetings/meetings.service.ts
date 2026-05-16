@@ -14,6 +14,7 @@ import { MeetingStatus } from './enums/meeting-status.enum';
 import { MeetingResponse } from './interfaces/meeting-response.interface';
 import { TranscriptionsService } from '../transcriptions/transcriptions.service';
 import { SummariesService } from '../summaries/summaries.service';
+import type { Express } from 'express';
 
 /** Allowed MIME types for audio uploads */
 const ALLOWED_MIME_TYPES = [
@@ -88,7 +89,10 @@ export class MeetingsService {
 
   /** Find a single meeting by ID (with eagerly loaded relations) */
   async findOne(id: string): Promise<MeetingResponse> {
-    const meeting = await this.meetingRepository.findOne({ where: { id } });
+    const meeting = await this.meetingRepository.findOne({
+      where: { id },
+      relations: ['transcription', 'summary'],
+    });
     if (!meeting) {
       throw new NotFoundException(`Meeting with id "${id}" not found.`);
     }
@@ -98,6 +102,7 @@ export class MeetingsService {
   /** Find all meetings ordered by creation date (newest first) */
   async findAll(): Promise<MeetingResponse[]> {
     const meetings = await this.meetingRepository.find({
+      relations: ['transcription', 'summary'],
       order: { createdAt: 'DESC' },
     });
     return meetings.map((m) => this.toResponse(m));

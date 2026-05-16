@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useState } from 'react';
+import { useCallback, useState, useEffect } from 'react';
 import { MeetingStatus } from '@/types/meeting';
 import { useUploadMeeting, useMeeting } from '@/hooks/useMeeting';
 
@@ -87,14 +87,16 @@ export function AudioUpload({ onComplete }: AudioUploadProps) {
   };
 
   // ── Notify parent when done ────────────────────────────────────────
-  if (
-    meetingId &&
-    meeting &&
-    (meeting.status === MeetingStatus.Completed ||
-      meeting.status === MeetingStatus.Failed)
-  ) {
-    onComplete?.(meetingId);
-  }
+  useEffect(() => {
+    if (
+      meetingId &&
+      meeting &&
+      (meeting.status === MeetingStatus.Completed ||
+        meeting.status === MeetingStatus.Failed)
+    ) {
+      onComplete?.(meetingId);
+    }
+  }, [meetingId, meeting, onComplete]);
 
   // ── Derived state ──────────────────────────────────────────────────
   const isUploading = upload.isPending;
