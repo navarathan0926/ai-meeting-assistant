@@ -1,0 +1,5 @@
+/**
+ * components/
+ * Shared, reusable UI components (buttons, inputs, modals, etc.)
+ * Feature-specific components live under their own feature folders.
+ */

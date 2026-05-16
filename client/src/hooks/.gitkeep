@@ -1,0 +1,6 @@
+/**
+ * hooks/
+ * Custom React hooks that wrap React Query queries/mutations.
+ * Each feature (meetings, transcriptions, summaries) will have
+ * its own hook file here (e.g., useMeetings.ts, useTranscription.ts).
+ */

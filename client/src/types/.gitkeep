@@ -1,0 +1,5 @@
+/**
+ * types/
+ * Shared TypeScript interfaces and types for API responses, DTOs, etc.
+ * Mirrors the server-side types so the full-stack stays in sync.
+ */

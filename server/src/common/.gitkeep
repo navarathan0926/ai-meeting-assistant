@@ -1,0 +1,5 @@
+/**
+ * common/
+ * Shared guards, decorators, filters, interceptors, and pipes
+ * used across all feature modules.
+ */
