@@ -10,6 +10,7 @@ import { SummaryResponse } from '../../summaries/interfaces/summary-response.int
 export interface MeetingResponse {
   id: string;
   originalFileName: string;
+  title: string | null;
   status: MeetingStatus;
   errorMessage?: string;
   transcription?: TranscriptionResponse;

@@ -6,6 +6,7 @@ import {
   Param,
   ParseUUIDPipe,
   Post,
+  Query,
   UploadedFile,
   UseInterceptors,
 } from '@nestjs/common';
@@ -51,12 +52,15 @@ export class MeetingsController {
 
   /**
    * GET /api/meetings
+   * GET /api/meetings?search=standup
    * Returns all meetings ordered by creation date (newest first).
-   * Used by the client to show a meeting history list.
+   * Optional `search` query param filters by title or original filename (case-insensitive).
    */
   @Get()
-  async findAll(): Promise<MeetingResponse[]> {
-    return this.meetingsService.findAll();
+  async findAll(
+    @Query('search') search?: string,
+  ): Promise<MeetingResponse[]> {
+    return this.meetingsService.findAll(search);
   }
 
   /**

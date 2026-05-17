@@ -4,12 +4,12 @@ An AI-powered meeting assistant that transcribes audio recordings and generates 
 
 ## Tech Stack
 
-| Layer     | Technology                            |
-|-----------|---------------------------------------|
-| Frontend  | Next.js 16, TailwindCSS, React Query  |
-| Backend   | NestJS 10, TypeORM                    |
-| Database  | PostgreSQL                            |
-| AI        | OpenAI Whisper + GPT APIs             |
+| Layer    | Technology                           |
+| -------- | ------------------------------------ |
+| Frontend | Next.js 16, TailwindCSS, React Query |
+| Backend  | NestJS 10, TypeORM                   |
+| Database | PostgreSQL                           |
+| AI       | OpenAI Whisper + GPT APIs            |
 
 ## Project Structure
 
@@ -35,6 +35,7 @@ sample-meeting-assistent/
 ## Getting Started
 
 ### Prerequisites
+
 - Node.js ≥ 18
 - PostgreSQL running locally
 
@@ -58,7 +59,9 @@ npm run dev                   # Starts on http://localhost:3000
 
 ## Development Phases
 
-| Phase | Description                        | Status |
-|-------|------------------------------------|--------|
+| Phase | Description                        | Status  |
+| ----- | ---------------------------------- | ------- |
 | 0     | Project Setup                      | ✅ Done |
-| 1     | MVP Core Flow (upload, transcribe) | 🔜 Next |
+| 1     | MVP Core Flow (upload, transcribe) | ✅ Done |
+| 2     | Database Integration               | ✅ Done |
+| 3     | Cloud Storage (Azure Blob)         | 🔜 Next |

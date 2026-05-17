@@ -71,9 +71,16 @@ export class MeetingsService {
     fs.writeFileSync(filePath, file.buffer);
     this.logger.log(`File saved: ${storedFileName}`);
 
+    // Derive a human-friendly title from the filename (strip extension)
+    const title = path.basename(
+      file.originalname,
+      path.extname(file.originalname),
+    );
+
     // Create the meeting record immediately so the client gets an ID
     const meeting = this.meetingRepository.create({
       originalFileName: file.originalname,
+      title,
       storedFileName,
       status: MeetingStatus.PENDING,
     });
@@ -99,12 +106,26 @@ export class MeetingsService {
     return this.toResponse(meeting);
   }
 
-  /** Find all meetings ordered by creation date (newest first) */
-  async findAll(): Promise<MeetingResponse[]> {
-    const meetings = await this.meetingRepository.find({
-      relations: ['transcription', 'summary'],
-      order: { createdAt: 'DESC' },
-    });
+  /**
+   * Find all meetings ordered by creation date (newest first).
+   * Optionally filters by a search term against `title` and `originalFileName`
+   * using case-insensitive ILIKE (Postgres).
+   */
+  async findAll(search?: string): Promise<MeetingResponse[]> {
+    const qb = this.meetingRepository
+      .createQueryBuilder('meeting')
+      .leftJoinAndSelect('meeting.transcription', 'transcription')
+      .leftJoinAndSelect('meeting.summary', 'summary')
+      .orderBy('meeting.createdAt', 'DESC');
+
+    if (search?.trim()) {
+      qb.where(
+        '(meeting.title ILIKE :q OR meeting.originalFileName ILIKE :q)',
+        { q: `%${search.trim()}%` },
+      );
+    }
+
+    const meetings = await qb.getMany();
     return meetings.map((m) => this.toResponse(m));
   }
 
@@ -199,6 +220,7 @@ export class MeetingsService {
     return {
       id: meeting.id,
       originalFileName: meeting.originalFileName,
+      title: meeting.title ?? null,
       status: meeting.status,
       errorMessage: meeting.errorMessage ?? undefined,
       transcription: meeting.transcription

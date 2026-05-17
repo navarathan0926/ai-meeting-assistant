@@ -1,28 +1,18 @@
 import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
-import { ConfigModule, ConfigService } from '@nestjs/config';
-import { Meeting } from 'src/meetings/entities/meeting.entity';
-import { Transcription } from 'src/transcriptions/entities/transcription.entity';
-import { Summary } from 'src/summaries/entities/summary.entity';
+import { buildDataSourceOptions } from './data-source';
 
+/**
+ * DatabaseModule
+ * Registers TypeORM using the shared buildDataSourceOptions() factory from
+ * data-source.ts — the single source of truth for all DB connection config.
+ *
+ * dotenv.config() is called inside data-source.ts at import time, so
+ * process.env is already populated with .env values when forRoot() runs.
+ */
 @Module({
   imports: [
-    TypeOrmModule.forRootAsync({
-      imports: [ConfigModule],
-      inject: [ConfigService],
-      useFactory: (config: ConfigService) => ({
-        type: 'postgres',
-        host: config.get<string>('DB_HOST', 'localhost'),
-        port: config.get<number>('DB_PORT', 5432),
-        username: config.get<string>('DB_USERNAME', 'postgres'),
-        password: config.get<string>('DB_PASSWORD', ''),
-        database: config.get<string>('DB_NAME', 'meeting_assistant'),
-        // autoLoadEntities: true,
-        entities: [Meeting,Summary,Transcription],
-        synchronize: false,
-        logging: false,
-      }),
-    }),
+    TypeOrmModule.forRoot(buildDataSourceOptions()),
   ],
 })
 export class DatabaseModule {}
