@@ -5,6 +5,7 @@ import { MeetingsController } from './meetings.controller';
 import { MeetingsService } from './meetings.service';
 import { TranscriptionsModule } from '../transcriptions/transcriptions.module';
 import { SummariesModule } from '../summaries/summaries.module';
+import { StorageModule } from '../storage/storage.module';
 
 /**
  * MeetingsModule
@@ -16,6 +17,7 @@ import { SummariesModule } from '../summaries/summaries.module';
     TypeOrmModule.forFeature([Meeting]),
     TranscriptionsModule,
     SummariesModule,
+    StorageModule,
   ],
   controllers: [MeetingsController],
   providers: [MeetingsService],

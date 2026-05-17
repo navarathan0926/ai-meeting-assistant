@@ -7,13 +7,13 @@ import {
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import * as path from 'path';
-import * as fs from 'fs';
 import { v4 as uuidv4 } from 'uuid';
 import { Meeting } from './entities/meeting.entity';
 import { MeetingStatus } from './enums/meeting-status.enum';
 import { MeetingResponse } from './interfaces/meeting-response.interface';
 import { TranscriptionsService } from '../transcriptions/transcriptions.service';
 import { SummariesService } from '../summaries/summaries.service';
+import { BlobStorageService } from '../storage/blob-storage.service';
 import type { Express } from 'express';
 
 /** Allowed MIME types for audio uploads */
@@ -41,17 +41,14 @@ const MAX_FILE_SIZE_BYTES = 25 * 1024 * 1024;
 @Injectable()
 export class MeetingsService {
   private readonly logger = new Logger(MeetingsService.name);
-  private readonly uploadsDir: string;
 
   constructor(
     @InjectRepository(Meeting)
     private readonly meetingRepository: Repository<Meeting>,
     private readonly transcriptionsService: TranscriptionsService,
     private readonly summariesService: SummariesService,
-  ) {
-    this.uploadsDir = path.join(process.cwd(), 'uploads');
-    this.ensureUploadsDirExists();
-  }
+    private readonly blobStorageService: BlobStorageService,
+  ) {}
 
   // ── Public API ────────────────────────────────────────────────────
 
@@ -65,11 +62,12 @@ export class MeetingsService {
     this.validateFile(file);
 
     const storedFileName = this.buildStoredFileName(file);
-    const filePath = path.join(this.uploadsDir, storedFileName);
 
-    // Persist the uploaded buffer to disk
-    fs.writeFileSync(filePath, file.buffer);
-    this.logger.log(`File saved: ${storedFileName}`);
+    // Persist the uploaded buffer to Azure Blob Storage
+    await this.blobStorageService.uploadBuffer(storedFileName, file.buffer, {
+      contentType: file.mimetype,
+    });
+    this.logger.log(`File uploaded to Blob Storage: ${storedFileName}`);
 
     // Derive a human-friendly title from the filename (strip extension)
     const title = path.basename(
@@ -87,7 +85,7 @@ export class MeetingsService {
     const saved = await this.meetingRepository.save(meeting);
 
     // Process asynchronously — caller gets the PENDING record right away
-    this.processAsync(saved.id, filePath).catch((err) =>
+    this.processAsync(saved.id, storedFileName).catch((err) =>
       this.logger.error(`processAsync failed for meeting ${saved.id}`, err),
     );
 
@@ -126,7 +124,7 @@ export class MeetingsService {
     }
 
     const meetings = await qb.getMany();
-    return meetings.map((m) => this.toResponse(m));
+    return Promise.all(meetings.map((m) => this.toResponse(m)));
   }
 
   // ── Private helpers ───────────────────────────────────────────────
@@ -136,11 +134,14 @@ export class MeetingsService {
    * Runs transcription → summarisation sequentially.
    * Updates meeting status at each stage so the client can poll.
    */
-  private async processAsync(meetingId: string, filePath: string): Promise<void> {
+  private async processAsync(meetingId: string, blobName: string): Promise<void> {
     const meeting = await this.meetingRepository.findOne({
       where: { id: meetingId },
     });
     if (!meeting) return;
+
+    const { filePath, cleanup } =
+      await this.blobStorageService.downloadToTempFile(blobName);
 
     try {
       // ── 1. Mark as processing ────────────────────────────────────
@@ -172,6 +173,8 @@ export class MeetingsService {
         MeetingStatus.FAILED,
         (error as Error).message,
       );
+    } finally {
+      await cleanup();
     }
   }
 
@@ -185,7 +188,7 @@ export class MeetingsService {
     await this.meetingRepository.save(meeting);
   }
 
-  /** Validates MIME type and file size before touching the disk */
+  /** Validates MIME type and file size before persisting anywhere */
   private validateFile(file: Express.Multer.File): void {
     if (!file) {
       throw new BadRequestException('No audio file provided.');
@@ -208,19 +211,22 @@ export class MeetingsService {
     return `${uuidv4()}${ext}`;
   }
 
-  private ensureUploadsDirExists(): void {
-    if (!fs.existsSync(this.uploadsDir)) {
-      fs.mkdirSync(this.uploadsDir, { recursive: true });
-      this.logger.log(`Created uploads directory: ${this.uploadsDir}`);
-    }
-  }
-
   /** Maps a Meeting entity to the client-facing MeetingResponse */
   private toResponse(meeting: Meeting): MeetingResponse {
+    let audioUrl: string | undefined;
+    try {
+      audioUrl = this.blobStorageService.getReadSasUrl(meeting.storedFileName);
+    } catch (err) {
+      this.logger.warn(
+        `Unable to generate SAS URL for meeting ${meeting.id}: ${(err as Error).message}`,
+      );
+    }
+
     return {
       id: meeting.id,
       originalFileName: meeting.originalFileName,
       title: meeting.title ?? null,
+      audioUrl,
       status: meeting.status,
       errorMessage: meeting.errorMessage ?? undefined,
       transcription: meeting.transcription

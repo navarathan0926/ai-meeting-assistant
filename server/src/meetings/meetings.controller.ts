@@ -38,8 +38,8 @@ export class MeetingsController {
   @HttpCode(HttpStatus.ACCEPTED) // 202 — work started, not yet done
   @UseInterceptors(
     FileInterceptor('audio', {
-      // Keep file in memory (buffer) — MeetingsService writes to disk
-      // after validation so we don't litter the disk with invalid files.
+      // Keep file in memory (buffer) — MeetingsService uploads to Blob Storage
+      // after validation so we don't persist invalid files.
       storage: undefined, // defaults to memoryStorage
       limits: { fileSize: 25 * 1024 * 1024 }, // guard at the HTTP layer too
     }),
