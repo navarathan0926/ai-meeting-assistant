@@ -3,6 +3,7 @@
 import { useCallback, useState, useEffect } from 'react';
 import { MeetingStatus } from '@/types/meeting';
 import { useUploadMeeting, useMeeting } from '@/hooks/useMeeting';
+import { useToast } from '@/providers/ToastProvider';
 
 interface AudioUploadProps {
   /** Called when processing finishes (completed or failed) */
@@ -25,7 +26,9 @@ export function AudioUpload({ onComplete }: AudioUploadProps) {
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [validationError, setValidationError] = useState<string | null>(null);
   const [meetingId, setMeetingId] = useState<string | null>(null);
+  const [toastShownForId, setToastShownForId] = useState<string | null>(null);
 
+  const { showToast } = useToast();
   const upload = useUploadMeeting();
   const { data: meeting } = useMeeting(meetingId);
 
@@ -80,9 +83,10 @@ export function AudioUpload({ onComplete }: AudioUploadProps) {
     try {
       const created = await upload.mutateAsync(selectedFile);
       setMeetingId(created.id);
+      showToast('Recording uploaded! Processing started...', 'success');
       // onComplete fires when the polling hook sees a terminal status
-    } catch {
-      // upload.error handles the display
+    } catch (err) {
+      showToast((err as Error).message || 'Failed to upload recording.', 'error');
     }
   };
 
@@ -94,9 +98,17 @@ export function AudioUpload({ onComplete }: AudioUploadProps) {
       (meeting.status === MeetingStatus.Completed ||
         meeting.status === MeetingStatus.Failed)
     ) {
+      if (toastShownForId !== meetingId) {
+        setToastShownForId(meetingId);
+        if (meeting.status === MeetingStatus.Completed) {
+          showToast('Meeting processing completed successfully!', 'success');
+        } else {
+          showToast(meeting.errorMessage || 'Meeting processing failed.', 'error');
+        }
+      }
       onComplete?.(meetingId);
     }
-  }, [meetingId, meeting, onComplete]);
+  }, [meetingId, meeting, onComplete, toastShownForId, showToast]);
 
   // ── Derived state ──────────────────────────────────────────────────
   const isUploading = upload.isPending;

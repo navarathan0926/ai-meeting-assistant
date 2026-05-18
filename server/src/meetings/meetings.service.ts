@@ -127,7 +127,35 @@ export class MeetingsService {
     return Promise.all(meetings.map((m) => this.toResponse(m)));
   }
 
-  // ── Private helpers ───────────────────────────────────────────────
+  /**
+   * deleteMeeting
+   * Removes the blob from Azure first (best-effort), then hard-deletes the
+   * DB record. Cascade on the entity removes the linked Transcription and
+   * Summary rows automatically.
+   *
+   * Blob deletion is attempted even if the blob is already gone — deleteBlob
+   * uses deleteIfExists so it will never throw a 404.
+   */
+  async deleteMeeting(id: string): Promise<void> {
+    const meeting = await this.meetingRepository.findOne({ where: { id } });
+    if (!meeting) {
+      throw new NotFoundException(`Meeting with id "${id}" not found.`);
+    }
+
+    // Remove blob from Azure (best-effort — don't block DB delete if it fails)
+    try {
+      await this.blobStorageService.deleteBlob(meeting.storedFileName);
+    } catch (err) {
+      this.logger.warn(
+        `Could not delete blob "${meeting.storedFileName}" for meeting ${id}: ${(err as Error).message}`,
+      );
+    }
+
+    await this.meetingRepository.remove(meeting);
+    this.logger.log(`Meeting ${id} deleted.`);
+  }
+
+
 
   /**
    * processAsync

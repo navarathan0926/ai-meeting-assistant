@@ -64,4 +64,5 @@ npm run dev                   # Starts on http://localhost:3000
 | 0     | Project Setup                      | ✅ Done |
 | 1     | MVP Core Flow (upload, transcribe) | ✅ Done |
 | 2     | Database Integration               | ✅ Done |
-| 3     | Cloud Storage (Azure Blob)         | 🔜 Next |
+| 3     | Cloud Storage (Azure Blob)         | ✅ Done |
+| 4     | Async Processing (BullMQ + Redis)  | 🔜 Next |

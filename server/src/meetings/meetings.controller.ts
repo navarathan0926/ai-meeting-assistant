@@ -1,5 +1,6 @@
 import {
   Controller,
+  Delete,
   Get,
   HttpCode,
   HttpStatus,
@@ -73,5 +74,19 @@ export class MeetingsController {
     @Param('id', ParseUUIDPipe) id: string,
   ): Promise<MeetingResponse> {
     return this.meetingsService.findOne(id);
+  }
+
+  /**
+   * DELETE /api/meetings/:id
+   * Permanently removes the meeting, its blob in Azure, and all linked
+   * records (transcription + summary) via DB cascade.
+   * Returns 204 No Content on success.
+   */
+  @Delete(':id')
+  @HttpCode(HttpStatus.NO_CONTENT)
+  async remove(
+    @Param('id', ParseUUIDPipe) id: string,
+  ): Promise<void> {
+    return this.meetingsService.deleteMeeting(id);
   }
 }

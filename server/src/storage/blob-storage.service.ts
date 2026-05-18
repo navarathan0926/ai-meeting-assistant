@@ -146,4 +146,19 @@ export class BlobStorageService {
 
     return `${blobClient.url}?${sas}`;
   }
+
+  /**
+   * Deletes a blob from the container.
+   * Uses deleteIfExists so it is safe to call even when the blob no longer
+   * exists (e.g. it was already cleaned up after transcription).
+   */
+  async deleteBlob(blobName: string): Promise<void> {
+    const blobClient = this.containerClient.getBlobClient(blobName);
+    const { succeeded } = await blobClient.deleteIfExists();
+    if (succeeded) {
+      this.logger.log(`Blob deleted: ${blobName}`);
+    } else {
+      this.logger.warn(`Blob not found (already deleted?): ${blobName}`);
+    }
+  }
 }

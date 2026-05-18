@@ -37,6 +37,10 @@ export default function HomePage() {
           <MeetingHistory
             activeMeetingId={activeMeetingId}
             onSelect={setActiveMeetingId}
+            onDelete={(id) => {
+              // If the deleted meeting is the one being viewed, clear the panel
+              if (activeMeetingId === id) setActiveMeetingId(null);
+            }}
           />
         </aside>
 

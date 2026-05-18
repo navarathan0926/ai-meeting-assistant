@@ -56,9 +56,9 @@ Move audio file storage from local to cloud using Azure Blob Storage.
 
 ## Verification Checklist
 
-- [ ] Storage Account + Blob Container are configured correctly.
-- [ ] Files are uploaded to Blob Storage.
-- [ ] SAS URLs provide secure access.
+- [x] Storage Account + Blob Container are configured correctly.
+- [x] Files are uploaded to Blob Storage.
+- [x] SAS URLs provide secure access.
 
 ## Further Considerations
 
