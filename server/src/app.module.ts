@@ -4,24 +4,19 @@ import { AppController } from './app.controller';
 import { AppService } from './app.service';
 import { DatabaseModule } from './database/database.module';
 import { MeetingsModule } from './meetings/meetings.module';
+import { HealthController } from './health/health.controller';
 
 @Module({
   imports: [
-    // ── Config (global) ─────────────────────────────────────────────
     ConfigModule.forRoot({
       isGlobal: true,
       envFilePath: '.env',
     }),
-
-    // ── Database ────────────────────────────────────────────────────
     DatabaseModule,
 
-    // ── Feature modules ─────────────────────────────────────────────
-    // TranscriptionsModule and SummariesModule are imported transitively
-    // through MeetingsModule — no need to add them here.
     MeetingsModule,
   ],
-  controllers: [AppController],
+  controllers: [AppController, HealthController],
   providers: [AppService],
 })
-export class AppModule {}
+export class AppModule { }

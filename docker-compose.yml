@@ -1,0 +1,34 @@
+services:
+  # ─── NestJS Backend ──────────────────────────────────────────────────────────
+  server:
+    build:
+      context: ./server
+      dockerfile: Dockerfile
+    container_name: meeting_assistant_server
+    restart: always
+    ports:
+      - "4000:4000"
+    env_file:
+      - ./server/.env          # provides all DB_*, OPENAI_*, AZURE_* etc.
+    environment:
+      PORT: 4000
+    volumes:
+      - server_uploads:/app/uploads
+
+  # ─── Next.js Frontend ────────────────────────────────────────────────────────
+  client:
+    build:
+      context: ./client
+      dockerfile: Dockerfile
+    container_name: meeting_assistant_client
+    restart: always
+    ports:
+      - "3000:3000"
+    environment:
+      PORT: 3000
+      NEXT_PUBLIC_API_URL: http://localhost:4000
+    depends_on:
+      - server
+
+volumes:
+  server_uploads:

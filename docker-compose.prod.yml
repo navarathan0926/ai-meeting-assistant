@@ -1,0 +1,13 @@
+services:
+  server:
+    environment:
+      NODE_ENV: production
+    env_file:
+      - ./server/.env
+
+    command: npm run start:prod
+
+  client:
+    environment:
+      NODE_ENV: production
+    command: npm run start

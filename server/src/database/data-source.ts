@@ -37,13 +37,11 @@ export function buildDataSourceOptions(): DataSourceOptions {
     entities: [Meeting, Transcription, Summary],
     synchronize: false,
     logging: false,
-    // NOTE: no `migrations` here — the NestJS runtime must never load
-    // migration files. Migrations are applied via CLI only.
   };
 }
 
 /** CLI-only DataSource — do NOT inject this into NestJS providers */
 export const AppDataSource = new DataSource({
   ...buildDataSourceOptions(),
-  migrations: ['src/database/migrations/*.ts'],
+  migrations: [__dirname + '/migrations/*.{js,ts}'],
 });
