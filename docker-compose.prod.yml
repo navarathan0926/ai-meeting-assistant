@@ -3,7 +3,7 @@ services:
     environment:
       NODE_ENV: production
     env_file:
-      - ./server/.env
+      - ./server/.env.production
 
     command: npm run start:prod
 

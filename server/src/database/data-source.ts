@@ -37,6 +37,7 @@ export function buildDataSourceOptions(): DataSourceOptions {
     entities: [Meeting, Transcription, Summary],
     synchronize: false,
     logging: false,
+    ssl: process.env.DB_HOST !== 'localhost' ? { rejectUnauthorized: false } : false, //TODO: Need to check this false
   };
 }
 
