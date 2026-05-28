@@ -25,6 +25,14 @@ export class Meeting {
   @Column()
   originalFileName: string;
 
+  /**
+   * Human-friendly meeting title.
+   * Defaults to the audio filename (without extension) set at upload time.
+   * Can be updated by the user later.
+   */
+  @Column({ type: 'varchar', nullable: true })
+  title: string | null;
+
   /** UUID-based filename used to store the file on disk (avoids collisions) */
   @Column()
   storedFileName: string;

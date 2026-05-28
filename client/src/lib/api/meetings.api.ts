@@ -39,4 +39,13 @@ export const meetingsApi = {
     const response = await apiClient.get<ApiResponse<Meeting[]>>('/api/meetings');
     return response.data.data;
   },
+
+  /**
+   * Permanently delete a meeting by ID.
+   * Removes the blob from Azure and all linked DB records.
+   * Server returns 204 No Content.
+   */
+  delete: async (id: string): Promise<void> => {
+    await apiClient.delete(`/api/meetings/${id}`);
+  },
 };

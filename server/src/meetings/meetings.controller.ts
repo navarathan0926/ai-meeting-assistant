@@ -1,11 +1,13 @@
 import {
   Controller,
+  Delete,
   Get,
   HttpCode,
   HttpStatus,
   Param,
   ParseUUIDPipe,
   Post,
+  Query,
   UploadedFile,
   UseInterceptors,
 } from '@nestjs/common';
@@ -37,8 +39,8 @@ export class MeetingsController {
   @HttpCode(HttpStatus.ACCEPTED) // 202 — work started, not yet done
   @UseInterceptors(
     FileInterceptor('audio', {
-      // Keep file in memory (buffer) — MeetingsService writes to disk
-      // after validation so we don't litter the disk with invalid files.
+      // Keep file in memory (buffer) — MeetingsService uploads to Blob Storage
+      // after validation so we don't persist invalid files.
       storage: undefined, // defaults to memoryStorage
       limits: { fileSize: 25 * 1024 * 1024 }, // guard at the HTTP layer too
     }),
@@ -51,12 +53,15 @@ export class MeetingsController {
 
   /**
    * GET /api/meetings
+   * GET /api/meetings?search=standup
    * Returns all meetings ordered by creation date (newest first).
-   * Used by the client to show a meeting history list.
+   * Optional `search` query param filters by title or original filename (case-insensitive).
    */
   @Get()
-  async findAll(): Promise<MeetingResponse[]> {
-    return this.meetingsService.findAll();
+  async findAll(
+    @Query('search') search?: string,
+  ): Promise<MeetingResponse[]> {
+    return this.meetingsService.findAll(search);
   }
 
   /**
@@ -69,5 +74,19 @@ export class MeetingsController {
     @Param('id', ParseUUIDPipe) id: string,
   ): Promise<MeetingResponse> {
     return this.meetingsService.findOne(id);
+  }
+
+  /**
+   * DELETE /api/meetings/:id
+   * Permanently removes the meeting, its blob in Azure, and all linked
+   * records (transcription + summary) via DB cascade.
+   * Returns 204 No Content on success.
+   */
+  @Delete(':id')
+  @HttpCode(HttpStatus.NO_CONTENT)
+  async remove(
+    @Param('id', ParseUUIDPipe) id: string,
+  ): Promise<void> {
+    return this.meetingsService.deleteMeeting(id);
   }
 }

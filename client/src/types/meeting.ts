@@ -29,6 +29,8 @@ export interface Summary {
 export interface Meeting {
   id: string;
   originalFileName: string;
+  /** Time-limited URL to access the uploaded audio */
+  audioUrl?: string;
   status: MeetingStatus;
   errorMessage?: string;
   transcription?: Transcription;

@@ -1,7 +1,9 @@
 'use client';
 
+import { useState } from 'react';
 import { Meeting, MeetingStatus } from '@/types/meeting';
-import { useMeetings } from '@/hooks/useMeeting';
+import { useDeleteMeeting, useMeetings } from '@/hooks/useMeeting';
+import { ConfirmationModal } from '@/components/common/ConfirmationModal';
 
 const statusBadge: Record<MeetingStatus, string> = {
   [MeetingStatus.Pending]: 'bg-yellow-900/40 text-yellow-400',
@@ -13,14 +15,17 @@ const statusBadge: Record<MeetingStatus, string> = {
 interface MeetingHistoryProps {
   activeMeetingId?: string | null;
   onSelect: (id: string) => void;
+  /** Called with the deleted meeting ID so the parent can clear the active view */
+  onDelete?: (id: string) => void;
 }
+
 
 /**
  * MeetingHistory
  * Left-panel list of past meetings.
  * Clicking an item calls onSelect so the parent can show results.
  */
-export function MeetingHistory({ activeMeetingId, onSelect }: MeetingHistoryProps) {
+export function MeetingHistory({ activeMeetingId, onSelect, onDelete }: MeetingHistoryProps) {
   const { data: meetings, isLoading } = useMeetings();
 
   if (isLoading) {
@@ -47,6 +52,7 @@ export function MeetingHistory({ activeMeetingId, onSelect }: MeetingHistoryProp
           meeting={meeting}
           isActive={meeting.id === activeMeetingId}
           onClick={() => onSelect(meeting.id)}
+          onDelete={onDelete}
         />
       ))}
     </ul>
@@ -57,9 +63,16 @@ interface MeetingHistoryItemProps {
   meeting: Meeting;
   isActive: boolean;
   onClick: () => void;
+  onDelete?: (id: string) => void;
 }
 
-function MeetingHistoryItem({ meeting, isActive, onClick }: MeetingHistoryItemProps) {
+function MeetingHistoryItem({ meeting, isActive, onClick, onDelete }: MeetingHistoryItemProps) {
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  const { mutate: deleteMeeting, isPending: isDeleting } = useDeleteMeeting((id) => {
+    setIsModalOpen(false);
+    onDelete?.(id);
+  });
+
   const date = new Date(meeting.createdAt).toLocaleDateString('en-US', {
     month: 'short',
     day: 'numeric',
@@ -67,29 +80,72 @@ function MeetingHistoryItem({ meeting, isActive, onClick }: MeetingHistoryItemPr
     minute: '2-digit',
   });
 
+  const handleDeleteClick = (e: React.MouseEvent) => {
+    e.stopPropagation(); // don't trigger the select-meeting click
+    setIsModalOpen(true);
+  };
+
   return (
     <li>
-      <button
-        onClick={onClick}
+      <div
         className={[
-          'w-full text-left rounded-xl px-4 py-3 transition-all duration-150',
+          'group relative rounded-xl transition-all duration-150',
           isActive
             ? 'bg-indigo-600/30 border border-indigo-500/40'
             : 'hover:bg-white/5 border border-transparent',
         ].join(' ')}
       >
-        <p className="text-white/85 text-sm font-medium truncate">
-          {meeting.originalFileName}
-        </p>
-        <div className="flex items-center justify-between mt-1 gap-2">
-          <span className="text-white/35 text-xs">{date}</span>
-          <span
-            className={`text-xs rounded-full px-2 py-0.5 font-medium ${statusBadge[meeting.status]}`}
-          >
-            {meeting.status}
-          </span>
-        </div>
-      </button>
+        <button
+          onClick={onClick}
+          className="w-full text-left px-4 py-3"
+        >
+          <p className="text-white/85 text-sm font-medium truncate pr-6">
+            {meeting.originalFileName}
+          </p>
+          <div className="flex items-center justify-between mt-1 gap-2">
+            <span className="text-white/35 text-xs">{date}</span>
+            <span
+              className={`text-xs rounded-full px-2 py-0.5 font-medium ${statusBadge[meeting.status]}`}
+            >
+              {meeting.status}
+            </span>
+          </div>
+        </button>
+
+        {/* Delete button — visible on hover or when deleting */}
+        <button
+          onClick={handleDeleteClick}
+          disabled={isDeleting}
+          aria-label="Delete meeting"
+          className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 focus:opacity-100 transition-opacity p-1 rounded-md text-white/30 hover:text-red-400 hover:bg-red-400/10 disabled:cursor-not-allowed"
+        >
+          {isDeleting ? (
+            <svg className="animate-spin w-3.5 h-3.5" viewBox="0 0 24 24" fill="none">
+              <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+              <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z" />
+            </svg>
+          ) : (
+            <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+              <polyline points="3 6 5 6 21 6" />
+              <path d="M19 6l-1 14H6L5 6" />
+              <path d="M10 11v6M14 11v6" />
+              <path d="M9 6V4h6v2" />
+            </svg>
+          )}
+        </button>
+      </div>
+
+      {/* Confirmation Modal */}
+      <ConfirmationModal
+        isOpen={isModalOpen}
+        title="Delete Recording"
+        message={`Are you sure you want to permanently delete "${meeting.originalFileName}"? This will remove the audio file and all generated AI transcripts and summaries. This action cannot be undone.`}
+        confirmLabel="Delete"
+        cancelLabel="Cancel"
+        isConfirming={isDeleting}
+        onConfirm={() => deleteMeeting(meeting.id)}
+        onCancel={() => setIsModalOpen(false)}
+      />
     </li>
   );
 }

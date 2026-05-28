@@ -7,13 +7,13 @@ import {
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import * as path from 'path';
-import * as fs from 'fs';
 import { v4 as uuidv4 } from 'uuid';
 import { Meeting } from './entities/meeting.entity';
 import { MeetingStatus } from './enums/meeting-status.enum';
 import { MeetingResponse } from './interfaces/meeting-response.interface';
 import { TranscriptionsService } from '../transcriptions/transcriptions.service';
 import { SummariesService } from '../summaries/summaries.service';
+import { BlobStorageService } from '../storage/blob-storage.service';
 import type { Express } from 'express';
 
 /** Allowed MIME types for audio uploads */
@@ -41,17 +41,14 @@ const MAX_FILE_SIZE_BYTES = 25 * 1024 * 1024;
 @Injectable()
 export class MeetingsService {
   private readonly logger = new Logger(MeetingsService.name);
-  private readonly uploadsDir: string;
 
   constructor(
     @InjectRepository(Meeting)
     private readonly meetingRepository: Repository<Meeting>,
     private readonly transcriptionsService: TranscriptionsService,
     private readonly summariesService: SummariesService,
-  ) {
-    this.uploadsDir = path.join(process.cwd(), 'uploads');
-    this.ensureUploadsDirExists();
-  }
+    private readonly blobStorageService: BlobStorageService,
+  ) {}
 
   // ── Public API ────────────────────────────────────────────────────
 
@@ -65,22 +62,30 @@ export class MeetingsService {
     this.validateFile(file);
 
     const storedFileName = this.buildStoredFileName(file);
-    const filePath = path.join(this.uploadsDir, storedFileName);
 
-    // Persist the uploaded buffer to disk
-    fs.writeFileSync(filePath, file.buffer);
-    this.logger.log(`File saved: ${storedFileName}`);
+    // Persist the uploaded buffer to Azure Blob Storage
+    await this.blobStorageService.uploadBuffer(storedFileName, file.buffer, {
+      contentType: file.mimetype,
+    });
+    this.logger.log(`File uploaded to Blob Storage: ${storedFileName}`);
+
+    // Derive a human-friendly title from the filename (strip extension)
+    const title = path.basename(
+      file.originalname,
+      path.extname(file.originalname),
+    );
 
     // Create the meeting record immediately so the client gets an ID
     const meeting = this.meetingRepository.create({
       originalFileName: file.originalname,
+      title,
       storedFileName,
       status: MeetingStatus.PENDING,
     });
     const saved = await this.meetingRepository.save(meeting);
 
     // Process asynchronously — caller gets the PENDING record right away
-    this.processAsync(saved.id, filePath).catch((err) =>
+    this.processAsync(saved.id, storedFileName).catch((err) =>
       this.logger.error(`processAsync failed for meeting ${saved.id}`, err),
     );
 
@@ -99,27 +104,72 @@ export class MeetingsService {
     return this.toResponse(meeting);
   }
 
-  /** Find all meetings ordered by creation date (newest first) */
-  async findAll(): Promise<MeetingResponse[]> {
-    const meetings = await this.meetingRepository.find({
-      relations: ['transcription', 'summary'],
-      order: { createdAt: 'DESC' },
-    });
-    return meetings.map((m) => this.toResponse(m));
+  /**
+   * Find all meetings ordered by creation date (newest first).
+   * Optionally filters by a search term against `title` and `originalFileName`
+   * using case-insensitive ILIKE (Postgres).
+   */
+  async findAll(search?: string): Promise<MeetingResponse[]> {
+    const qb = this.meetingRepository
+      .createQueryBuilder('meeting')
+      .leftJoinAndSelect('meeting.transcription', 'transcription')
+      .leftJoinAndSelect('meeting.summary', 'summary')
+      .orderBy('meeting.createdAt', 'DESC');
+
+    if (search?.trim()) {
+      qb.where(
+        '(meeting.title ILIKE :q OR meeting.originalFileName ILIKE :q)',
+        { q: `%${search.trim()}%` },
+      );
+    }
+
+    const meetings = await qb.getMany();
+    return Promise.all(meetings.map((m) => this.toResponse(m)));
   }
 
-  // ── Private helpers ───────────────────────────────────────────────
+  /**
+   * deleteMeeting
+   * Removes the blob from Azure first (best-effort), then hard-deletes the
+   * DB record. Cascade on the entity removes the linked Transcription and
+   * Summary rows automatically.
+   *
+   * Blob deletion is attempted even if the blob is already gone — deleteBlob
+   * uses deleteIfExists so it will never throw a 404.
+   */
+  async deleteMeeting(id: string): Promise<void> {
+    const meeting = await this.meetingRepository.findOne({ where: { id } });
+    if (!meeting) {
+      throw new NotFoundException(`Meeting with id "${id}" not found.`);
+    }
+
+    // Remove blob from Azure (best-effort — don't block DB delete if it fails)
+    try {
+      await this.blobStorageService.deleteBlob(meeting.storedFileName);
+    } catch (err) {
+      this.logger.warn(
+        `Could not delete blob "${meeting.storedFileName}" for meeting ${id}: ${(err as Error).message}`,
+      );
+    }
+
+    await this.meetingRepository.remove(meeting);
+    this.logger.log(`Meeting ${id} deleted.`);
+  }
+
+
 
   /**
    * processAsync
    * Runs transcription → summarisation sequentially.
    * Updates meeting status at each stage so the client can poll.
    */
-  private async processAsync(meetingId: string, filePath: string): Promise<void> {
+  private async processAsync(meetingId: string, blobName: string): Promise<void> {
     const meeting = await this.meetingRepository.findOne({
       where: { id: meetingId },
     });
     if (!meeting) return;
+
+    const { filePath, cleanup } =
+      await this.blobStorageService.downloadToTempFile(blobName);
 
     try {
       // ── 1. Mark as processing ────────────────────────────────────
@@ -151,6 +201,8 @@ export class MeetingsService {
         MeetingStatus.FAILED,
         (error as Error).message,
       );
+    } finally {
+      await cleanup();
     }
   }
 
@@ -164,7 +216,7 @@ export class MeetingsService {
     await this.meetingRepository.save(meeting);
   }
 
-  /** Validates MIME type and file size before touching the disk */
+  /** Validates MIME type and file size before persisting anywhere */
   private validateFile(file: Express.Multer.File): void {
     if (!file) {
       throw new BadRequestException('No audio file provided.');
@@ -187,18 +239,22 @@ export class MeetingsService {
     return `${uuidv4()}${ext}`;
   }
 
-  private ensureUploadsDirExists(): void {
-    if (!fs.existsSync(this.uploadsDir)) {
-      fs.mkdirSync(this.uploadsDir, { recursive: true });
-      this.logger.log(`Created uploads directory: ${this.uploadsDir}`);
-    }
-  }
-
   /** Maps a Meeting entity to the client-facing MeetingResponse */
   private toResponse(meeting: Meeting): MeetingResponse {
+    let audioUrl: string | undefined;
+    try {
+      audioUrl = this.blobStorageService.getReadSasUrl(meeting.storedFileName);
+    } catch (err) {
+      this.logger.warn(
+        `Unable to generate SAS URL for meeting ${meeting.id}: ${(err as Error).message}`,
+      );
+    }
+
     return {
       id: meeting.id,
       originalFileName: meeting.originalFileName,
+      title: meeting.title ?? null,
+      audioUrl,
       status: meeting.status,
       errorMessage: meeting.errorMessage ?? undefined,
       transcription: meeting.transcription

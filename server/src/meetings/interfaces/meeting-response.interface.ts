@@ -10,6 +10,9 @@ import { SummaryResponse } from '../../summaries/interfaces/summary-response.int
 export interface MeetingResponse {
   id: string;
   originalFileName: string;
+  title: string | null;
+  /** Time-limited (SAS) URL to access the uploaded audio in Blob Storage */
+  audioUrl?: string;
   status: MeetingStatus;
   errorMessage?: string;
   transcription?: TranscriptionResponse;

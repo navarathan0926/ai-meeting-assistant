@@ -48,12 +48,22 @@ Integrate a database to persist meeting data, including transcripts and summarie
 - Phase 1: Core flow must be functional.
 
 ## Verification Checklist
-- [ ] Database schema matches the design.
-- [ ] Migrations run successfully.
-- [ ] Meeting data is stored correctly.
-- [ ] Meeting history API returns accurate results.
+- [x] Database schema matches the design (`meetings`, `transcriptions`, `summaries` tables with all required fields).
+- [x] Migrations run successfully (`npm run migration:run` — `InitialSchema` applied cleanly).
+- [x] Meeting data is stored correctly (entity relations cascade-saved via async pipeline).
+- [x] Meeting history API returns accurate results (`GET /api/meetings`, `GET /api/meetings/:id`).
+- [x] Search functionality implemented (`GET /api/meetings?search=<term>` — ILIKE on title + originalFileName).
+- [x] `title` field added to meetings (auto-derived from filename on upload, nullable varchar).
+
+## Migration Commands
+```bash
+npm run migration:generate   # diff entities → new migration file
+npm run migration:run        # apply pending migrations to DB
+npm run migration:revert     # undo the last applied migration
+npm run migration:create     # create a blank migration file
+```
 
 ## Further Considerations
-- Optimize queries for performance.
-- Plan for future schema changes.
+- Optimize queries for performance (add indexes on `status`, `createdAt`).
+- Plan for future schema changes via new migrations (never use `synchronize: true` in production).
 - Ensure data integrity and consistency.

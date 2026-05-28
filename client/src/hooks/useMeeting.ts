@@ -1,6 +1,8 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { meetingsApi } from '@/lib/api/meetings.api';
 import { Meeting, MeetingStatus } from '@/types/meeting';
+import { useToast } from '@/providers/ToastProvider';
+
 
 // ── Query keys ────────────────────────────────────────────────────────────────
 // Centralised so cache invalidation is never a string guess.
@@ -58,5 +60,33 @@ export function useMeetings() {
   return useQuery<Meeting[], Error>({
     queryKey: meetingKeys.all,
     queryFn: meetingsApi.getAll,
+  });
+}
+
+// ── useDeleteMeeting ──────────────────────────────────────────────────────────
+
+/**
+ * Deletes a meeting by ID.
+ * On success:
+ *  - removes the detail cache entry so stale data is never shown
+ *  - invalidates the list cache so the history sidebar refreshes
+ * Accepts an optional onSuccess callback so the parent can clear the
+ * active selection when the currently-viewed meeting is deleted.
+ */
+export function useDeleteMeeting(onSuccess?: (id: string) => void) {
+  const queryClient = useQueryClient();
+  const { showToast } = useToast();
+
+  return useMutation<void, Error, string>({
+    mutationFn: (id: string) => meetingsApi.delete(id),
+    onSuccess: (_, id) => {
+      queryClient.removeQueries({ queryKey: meetingKeys.detail(id) });
+      queryClient.invalidateQueries({ queryKey: meetingKeys.all });
+      showToast('Meeting deleted successfully!', 'success');
+      onSuccess?.(id);
+    },
+    onError: (err) => {
+      showToast(err.message || 'Failed to delete meeting.', 'error');
+    },
   });
 }

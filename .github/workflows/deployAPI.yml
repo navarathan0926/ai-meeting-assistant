@@ -1,0 +1,51 @@
+name: Deploy API to Azure Container Apps
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - 'server/**' # Only run when files in the server folder change
+  workflow_dispatch:
+
+env:
+  IMAGE_NAME: nestjs-api
+  CONTEXT: ./server  # Define the context path
+
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Azure Login
+        uses: azure/login@v1
+        with:
+          creds: ${{ secrets.AZURE_CREDENTIALS }}
+
+      - name: Log in to ACR
+        uses: azure/docker-login@v1
+        with:
+          login-server: ${{ secrets.REGISTRY_LOGIN_SERVER }}
+          username: ${{ secrets.REGISTRY_USERNAME }}
+          password: ${{ secrets.REGISTRY_PASSWORD }}
+
+      - name: Build and push Docker image
+        run: |
+          IMAGE_TAG=${{ secrets.REGISTRY_LOGIN_SERVER }}/${{ env.IMAGE_NAME }}:${{ github.sha }}
+          # Point docker to the 'server' directory
+          docker build -t $IMAGE_TAG ${{ env.CONTEXT }}
+          docker push $IMAGE_TAG
+          echo "IMAGE_TAG=$IMAGE_TAG" >> $GITHUB_ENV
+
+      - name: Deploy to Container Apps
+        uses: azure/container-apps-deploy-action@v1
+        with:
+          resourceGroup: ${{ secrets.AZURE_RESOURCE_GROUP }}
+          containerAppName: ${{ secrets.AZURE_CONTAINER_APP_NAME }}
+          imageToDeploy: ${{ env.IMAGE_TAG }}
+          registryUrl: ${{ secrets.REGISTRY_LOGIN_SERVER }}
+          registryUsername: ${{ secrets.REGISTRY_USERNAME }}
+          registryPassword: ${{ secrets.REGISTRY_PASSWORD }}
