@@ -34,7 +34,7 @@ jobs:
 
       - name: Build and push Docker image
         run: |
-          IMAGE_TAG=${{ secrets.REGISTRY_LOGIN_SERVER }}/${{ env.IMAGE_NAME }}:${{ github.sha }}
+          IMAGE_TAG=${{ secrets.REGISTRY_LOGIN_SERVER }}/meeting-api:${{ github.sha }}
           # Point docker to the 'server' directory
           docker build -t $IMAGE_TAG ${{ env.CONTEXT }}
           docker push $IMAGE_TAG
