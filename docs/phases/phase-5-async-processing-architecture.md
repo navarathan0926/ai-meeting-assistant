@@ -1,4 +1,4 @@
-# Phase 4 — Async Processing Architecture
+# Phase 5 — Async Processing Architecture
 
 ## Phase Overview
 Implement an asynchronous processing architecture to handle long-running jobs like transcription and summarization.
