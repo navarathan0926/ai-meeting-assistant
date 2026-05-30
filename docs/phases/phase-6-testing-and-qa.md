@@ -1,4 +1,4 @@
-# Phase 5 — Testing & QA
+# Phase 6 — Testing & QA
 
 ## Phase Overview
 Ensure the quality and reliability of the AI Meeting Assistant through comprehensive testing.
@@ -15,7 +15,7 @@ Ensure the quality and reliability of the AI Meeting Assistant through comprehen
   - End-to-end tests for user flows.
 - **Tools**:
   - Jest for unit and integration tests.
-  - Cypress for end-to-end tests.
+  - Playwright for end-to-end tests.
 
 ## Key Components
 - Test cases for frontend and backend.
@@ -36,8 +36,8 @@ Ensure the quality and reliability of the AI Meeting Assistant through comprehen
    - Set up CI/CD pipelines to run tests automatically.
 
 ## Technologies & Tools
-- **Testing**: Jest, Cypress.
-- **CI/CD**: GitHub Actions, Jenkins, or similar.
+- **Testing**: Jest, Playwright.
+- **CI/CD**: GitHub Actions.
 
 ## Dependencies
 - Phases 0–4 must be functional.

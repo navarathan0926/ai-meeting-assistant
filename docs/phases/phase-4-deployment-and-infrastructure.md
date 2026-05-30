@@ -1,4 +1,4 @@
-# Phase 6 — Deployment & Infrastructure
+# Phase 4 — Deployment & Infrastructure
 
 ## Phase Overview
 Deploy the AI Meeting Assistant to production and set up infrastructure for scalability and reliability.
@@ -32,23 +32,23 @@ Deploy the AI Meeting Assistant to production and set up infrastructure for scal
    - Use GitHub Actions, Jenkins, or similar.
 3. **Deployment**:
    - Deploy to staging environment.
-   - Deploy to production environment.
+   - Deploy to production environment using Azure Container Apps.
 4. **Monitoring**:
-   - Set up Prometheus and Grafana for performance monitoring.
-   - Set up logging with tools like ELK stack.
+   - Set up Azure Monitor for performance monitoring.
+   - Set up Log Analytics Workspace for centralized logging.
 
 ## Technologies & Tools
 - **Containerization**: Docker.
-- **CI/CD**: GitHub Actions, Jenkins.
-- **Monitoring**: Prometheus, Grafana.
+- **CI/CD**: GitHub Actions.
+- **Monitoring**: Azure Monitor, Azure Log Analytics.
 
 ## Dependencies
 - Phases 0–5 must be complete.
 
 ## Verification Checklist
-- [ ] Application runs in Docker containers.
-- [ ] CI/CD pipelines deploy successfully.
-- [ ] Monitoring tools are set up and functional.
+- [x] Application runs in Docker containers on Azure Container Apps.
+- [x] CI/CD pipelines deploy successfully via GitHub Actions.
+- [x] Monitoring tools (Azure Monitor/Log Analytics) are set up and functional.
 
 ## Further Considerations
 - Plan for scaling infrastructure.

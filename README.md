@@ -65,8 +65,9 @@ npm run dev                   # Starts on http://localhost:3000
 | 1     | MVP Core Flow (upload, transcribe) | ✅ Done |
 | 2     | Database Integration               | ✅ Done |
 | 3     | Cloud Storage (Azure Blob)         | ✅ Done |
-| 4     | Async Processing (BullMQ + Redis)  | 🔜 Next |
-| 6     | Deployment & Infrastructure (Docker)| 🚀 Active |
+| 4     | Deployment & Infrastructure (Docker)| 🚀 Active |
+| 5     | Async Processing (BullMQ + Redis)  | 🔜 Next |
+| 6     | Testing & QA                       | 🔜 Next |
 
 ## Docker Deployment (ASAP Production Method)
 
