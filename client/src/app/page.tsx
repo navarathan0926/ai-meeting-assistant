@@ -27,10 +27,10 @@ export default function HomePage() {
       </header>
 
       {/* ── Main layout ────────────────────────────────────────────── */}
-      <div className="flex flex-1 overflow-hidden">
+      <div className="flex flex-col md:flex-row flex-1 overflow-hidden">
 
         {/* Left sidebar — history */}
-        <aside className="hidden md:flex flex-col w-72 shrink-0 border-r border-white/8 p-4 gap-4 overflow-y-auto">
+        <aside className="flex flex-col w-full md:w-72 shrink-0 border-b md:border-b-0 md:border-r border-white/8 p-4 gap-4 overflow-y-auto max-h-64 md:max-h-none">
           <p className="text-white/40 text-xs font-semibold uppercase tracking-wider px-1">
             Past Meetings
           </p>

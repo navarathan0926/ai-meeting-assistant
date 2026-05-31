@@ -85,6 +85,8 @@ function MeetingHistoryItem({ meeting, isActive, onClick, onDelete }: MeetingHis
     setIsModalOpen(true);
   };
 
+  const maxLength = 30;
+
   return (
     <li>
       <div
@@ -112,12 +114,12 @@ function MeetingHistoryItem({ meeting, isActive, onClick, onDelete }: MeetingHis
           </div>
         </button>
 
-        {/* Delete button — visible on hover or when deleting */}
+        {/* Delete button — visible on mobile, visible on hover/focus on desktop */}
         <button
           onClick={handleDeleteClick}
           disabled={isDeleting}
           aria-label="Delete meeting"
-          className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 focus:opacity-100 transition-opacity p-1 rounded-md text-white/30 hover:text-red-400 hover:bg-red-400/10 disabled:cursor-not-allowed"
+          className="absolute top-2 right-2 opacity-100 md:opacity-0 group-hover:opacity-100 focus:opacity-100 transition-opacity p-1 rounded-md text-white/30 hover:text-red-400 hover:bg-red-400/10 disabled:cursor-not-allowed"
         >
           {isDeleting ? (
             <svg className="animate-spin w-3.5 h-3.5" viewBox="0 0 24 24" fill="none">
@@ -139,7 +141,19 @@ function MeetingHistoryItem({ meeting, isActive, onClick, onDelete }: MeetingHis
       <ConfirmationModal
         isOpen={isModalOpen}
         title="Delete Recording"
-        message={`Are you sure you want to permanently delete "${meeting.originalFileName}"? This will remove the audio file and all generated AI transcripts and summaries. This action cannot be undone.`}
+        message={
+          <>
+            Are you sure you want to permanently delete &quot;{meeting.originalFileName.length > maxLength
+              ? meeting.originalFileName.slice(0, maxLength) + '...'
+              : meeting.originalFileName
+            }&quot;?
+            <br />
+            <br />
+            This will remove the audio file and all generated AI transcripts and summaries.
+            <br />
+            This action cannot be undone.
+          </>
+        }
         confirmLabel="Delete"
         cancelLabel="Cancel"
         isConfirming={isDeleting}

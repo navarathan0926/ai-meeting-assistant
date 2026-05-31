@@ -5,7 +5,7 @@ import React, { useEffect } from 'react';
 interface ConfirmationModalProps {
   isOpen: boolean;
   title: string;
-  message: string;
+  message: React.ReactNode;
   confirmLabel?: string;
   cancelLabel?: string;
   isConfirming?: boolean;
@@ -70,7 +70,7 @@ export function ConfirmationModal({
             <h3 className="text-base font-semibold text-white/95 leading-6">
               {title}
             </h3>
-            <p className="mt-2 text-sm text-white/60 leading-relaxed">
+            <p className="mt-2 text-sm text-white/60 leading-relaxed break-words">
               {message}
             </p>
           </div>
