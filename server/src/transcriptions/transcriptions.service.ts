@@ -82,6 +82,19 @@ export class TranscriptionsService {
     }
   }
 
+  /**
+   * deleteByMeetingId
+   * Removes the transcription row whose FK points to the given meeting.
+   * Safe to call even if no transcription exists yet (e.g. PENDING meetings).
+   */
+  async deleteByMeetingId(meetingId: string): Promise<void> {
+    await this.transcriptionRepository
+      .createQueryBuilder()
+      .delete()
+      .where('"meetingId" = :meetingId', { meetingId })
+      .execute();
+  }
+
   /** Map a Transcription entity to the client-facing interface */
   toResponse(transcription: Transcription): TranscriptionResponse {
     return {

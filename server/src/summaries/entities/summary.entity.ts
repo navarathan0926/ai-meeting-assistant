@@ -30,7 +30,9 @@ export class Summary {
   @Column({ type: 'simple-array' })
   actionItems: string[];
 
-  @OneToOne(() => Meeting, (meeting) => meeting.summary)
+  @OneToOne(() => Meeting, (meeting) => meeting.summary, {
+    onDelete: 'CASCADE',
+  })
   @JoinColumn()
   meeting: Meeting;
 

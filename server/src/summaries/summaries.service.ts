@@ -106,6 +106,19 @@ Respond ONLY with valid JSON. No markdown, no extra text.`;
     }
   }
 
+  /**
+   * deleteByMeetingId
+   * Removes the summary row whose FK points to the given meeting.
+   * Safe to call even if no summary exists yet.
+   */
+  async deleteByMeetingId(meetingId: string): Promise<void> {
+    await this.summaryRepository
+      .createQueryBuilder()
+      .delete()
+      .where('"meetingId" = :meetingId', { meetingId })
+      .execute();
+  }
+
   /** Map a Summary entity to the client-facing interface */
   toResponse(summary: Summary): SummaryResponse {
     return {

@@ -14,6 +14,7 @@ import { MeetingResponse } from './interfaces/meeting-response.interface';
 import { TranscriptionsService } from '../transcriptions/transcriptions.service';
 import { SummariesService } from '../summaries/summaries.service';
 import { BlobStorageService } from '../storage/blob-storage.service';
+import { ExtractionService } from '../extraction/extraction.service';
 import type { Express } from 'express';
 
 /** Allowed MIME types for audio uploads */
@@ -48,7 +49,8 @@ export class MeetingsService {
     private readonly transcriptionsService: TranscriptionsService,
     private readonly summariesService: SummariesService,
     private readonly blobStorageService: BlobStorageService,
-  ) {}
+    private readonly extractionService: ExtractionService,
+  ) { }
 
   // ── Public API ────────────────────────────────────────────────────
 
@@ -84,10 +86,8 @@ export class MeetingsService {
     });
     const saved = await this.meetingRepository.save(meeting);
 
-    // Process asynchronously — caller gets the PENDING record right away
-    this.processAsync(saved.id, storedFileName).catch((err) =>
-      this.logger.error(`processAsync failed for meeting ${saved.id}`, err),
-    );
+    // Queue job for asynchronous processing
+    await this.extractionService.addExtractJob(saved.id, storedFileName);
 
     return this.toResponse(saved);
   }
@@ -151,70 +151,16 @@ export class MeetingsService {
       );
     }
 
-    await this.meetingRepository.remove(meeting);
+    // Explicitly delete child rows first to respect FK constraints.
+    await this.transcriptionsService.deleteByMeetingId(id);
+    await this.summariesService.deleteByMeetingId(id);
+
+    await this.meetingRepository.delete(id);
     this.logger.log(`Meeting ${id} deleted.`);
   }
 
 
 
-  /**
-   * processAsync
-   * Runs transcription → summarisation sequentially.
-   * Updates meeting status at each stage so the client can poll.
-   */
-  private async processAsync(meetingId: string, blobName: string): Promise<void> {
-    const meeting = await this.meetingRepository.findOne({
-      where: { id: meetingId },
-    });
-    if (!meeting) return;
-
-    const { filePath, cleanup } =
-      await this.blobStorageService.downloadToTempFile(blobName);
-
-    try {
-      // ── 1. Mark as processing ────────────────────────────────────
-      await this.updateStatus(meeting, MeetingStatus.PROCESSING);
-
-      // ── 2. Transcribe ────────────────────────────────────────────
-      const transcription = await this.transcriptionsService.transcribeAudio({
-        filePath,
-        originalFileName: meeting.originalFileName,
-      });
-      transcription.meeting = meeting;
-      meeting.transcription = transcription;
-
-      // ── 3. Summarise ─────────────────────────────────────────────
-      const summary = await this.summariesService.summariseTranscript({
-        transcript: transcription.text,
-      });
-      summary.meeting = meeting;
-      meeting.summary = summary;
-
-      // ── 4. Mark completed ────────────────────────────────────────
-      await this.updateStatus(meeting, MeetingStatus.COMPLETED);
-
-      this.logger.log(`Meeting ${meetingId} processing complete.`);
-    } catch (error) {
-      this.logger.error(`Processing failed for meeting ${meetingId}`, error);
-      await this.updateStatus(
-        meeting,
-        MeetingStatus.FAILED,
-        (error as Error).message,
-      );
-    } finally {
-      await cleanup();
-    }
-  }
-
-  private async updateStatus(
-    meeting: Meeting,
-    status: MeetingStatus,
-    errorMessage?: string,
-  ): Promise<void> {
-    meeting.status = status;
-    if (errorMessage) meeting.errorMessage = errorMessage;
-    await this.meetingRepository.save(meeting);
-  }
 
   /** Validates MIME type and file size before persisting anywhere */
   private validateFile(file: Express.Multer.File): void {
