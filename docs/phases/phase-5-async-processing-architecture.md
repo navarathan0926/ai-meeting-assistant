@@ -161,14 +161,38 @@ Store job state in your existing DB:
 - Upstash Redis account created and `REDIS_URL` configured in Azure.
 
 ## Verification Checklist
-- [ ] Upstash Redis database created and URL added to Container App env vars.
-- [ ] BullMQ module configured with Upstash Redis connection (TLS enabled).
-- [ ] Extraction queue and processor implemented in NestJS.
-- [ ] API returns `202 Accepted` with `jobId` on extraction request.
-- [ ] Job status endpoint (`GET /extraction/:jobId/status`) working.
-- [ ] Worker processes jobs successfully (check Azure Log Analytics).
-- [ ] Retry logic working — failed jobs retry 3 times with exponential backoff.
-- [ ] Job status updates correctly in DB (`pending` → `processing` → `completed/failed`).
+- [x] Upstash Redis database created and URL added to Container App env vars.
+- [x] BullMQ module configured with Upstash Redis connection (TLS enabled).
+- [x] Extraction queue and processor implemented in NestJS.
+- [x] API returns `202 Accepted` with `jobId` on extraction request.
+- [x] Job status endpoint (`GET /extraction/:jobId/status`) working.
+- [x] Worker processes jobs successfully (check Azure Log Analytics).
+- [x] Retry logic working — failed jobs retry 3 times with exponential backoff.
+- [x] Job status updates correctly in DB (`pending` → `processing` → `completed/failed`).
+
+## Implementation Notes
+
+### Files Added / Modified
+| File | Change |
+|---|---|
+| `src/extraction/extraction.controller.ts` | **NEW** — `GET /api/extraction/:jobId/status` endpoint |
+| `src/extraction/extraction.service.ts` | Returns `jobId` (BullMQ job ID) from `addExtractJob()` |
+| `src/extraction/extraction.module.ts` | Registers `ExtractionController`; adds `defaultJobOptions` |
+| `src/extraction/extraction.processor.ts` | `concurrency: 2`; `job.updateProgress()` at each stage; last-attempt-only FAILED status |
+| `src/meetings/interfaces/meeting-response.interface.ts` | Added optional `jobId?: string` field |
+| `src/meetings/meetings.service.ts` | Captures `jobId` from queue; passes to `toResponse()` |
+| `src/common/filters/http-exception.filter.ts` | Upgraded `HttpExceptionFilter` → `AllExceptionsFilter` (`@Catch()`) |
+| `src/main.ts` | Registers `AllExceptionsFilter` globally |
+| `server/.env.example` | Added `REDIS_URL` section with local + Upstash examples |
+
+### Job Progress Milestones
+| Progress | Stage |
+|---|---|
+| `0` | Job picked up by worker |
+| `25` | DB status → `processing` |
+| `50` | Audio downloaded from Blob Storage |
+| `75` | Transcription complete |
+| `100` | Summary saved, DB status → `completed` |
 
 ## Further Considerations
 - Monitor queue performance via Upstash dashboard (free).
@@ -176,4 +200,4 @@ Store job state in your existing DB:
 - If daily commands exceed 10,000, upgrade Upstash to Pay-as-you-go (~$0.20 per 100K commands).
 - When scaling up, move worker to a separate Container App for independent scaling.
 - Plan for scaling workers if meeting volume grows significantly.
-- Ensure fault tolerance — jobs must not be lost if the container restarts (Upstash persists the queue).
+- Ensure fault tolerance — jobs must not be lost if the container restarts (Upstash persists the queue).
