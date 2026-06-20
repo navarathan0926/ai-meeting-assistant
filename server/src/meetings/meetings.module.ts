@@ -6,6 +6,7 @@ import { MeetingsService } from './meetings.service';
 import { TranscriptionsModule } from '../transcriptions/transcriptions.module';
 import { SummariesModule } from '../summaries/summaries.module';
 import { StorageModule } from '../storage/storage.module';
+import { ExtractionModule } from '../extraction/extraction.module';
 
 /**
  * MeetingsModule
@@ -18,6 +19,7 @@ import { StorageModule } from '../storage/storage.module';
     TranscriptionsModule,
     SummariesModule,
     StorageModule,
+    ExtractionModule,
   ],
   controllers: [MeetingsController],
   providers: [MeetingsService],

@@ -26,7 +26,9 @@ export class Transcription {
   @Column({ type: 'float', nullable: true })
   durationSeconds: number;
 
-  @OneToOne(() => Meeting, (meeting) => meeting.transcription)
+  @OneToOne(() => Meeting, (meeting) => meeting.transcription, {
+    onDelete: 'CASCADE',
+  })
   @JoinColumn()
   meeting: Meeting;
 

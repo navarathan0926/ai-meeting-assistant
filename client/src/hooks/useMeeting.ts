@@ -60,6 +60,16 @@ export function useMeetings() {
   return useQuery<Meeting[], Error>({
     queryKey: meetingKeys.all,
     queryFn: meetingsApi.getAll,
+    refetchInterval: (query) => {
+      const meetings = query.state.data;
+      if (!meetings) return false;
+      const hasPending = meetings.some(
+        (m) =>
+          m.status === MeetingStatus.Pending ||
+          m.status === MeetingStatus.Processing
+      );
+      return hasPending ? 3000 : false;
+    },
   });
 }
 

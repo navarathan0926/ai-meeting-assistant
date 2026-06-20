@@ -12,23 +12,40 @@ services:
       - ./server/.env          # provides all DB_*, OPENAI_*, AZURE_* etc.
     environment:
       PORT: 4000
+      DB_HOST: host.docker.internal  # Connects to localhost PostgreSQL on your Windows machine
     volumes:
       - server_uploads:/app/uploads
+    depends_on:
+      - redis
+
+
+  # ─── Redis Queue ─────────────────────────────────────────────────────────────
+  redis:
+    image: redis:7-alpine
+    container_name: meeting_assistant_redis
+    restart: always
+    ports:
+      - "6380:6379"
+    volumes:
+      - redis_data:/data
 
   # ─── Next.js Frontend ────────────────────────────────────────────────────────
   client:
     build:
       context: ./client
       dockerfile: Dockerfile
+      args:
+        NEXT_PUBLIC_API_URL: http://localhost:4000/
     container_name: meeting_assistant_client
     restart: always
     ports:
       - "3000:3000"
     environment:
       PORT: 3000
-      NEXT_PUBLIC_API_URL: http://localhost:4000
+      NEXT_PUBLIC_API_URL: http://localhost:4000/
     depends_on:
       - server
 
 volumes:
   server_uploads:
+  redis_data:
