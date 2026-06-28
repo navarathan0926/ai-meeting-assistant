@@ -16,6 +16,7 @@ import { DataSource, DataSourceOptions } from 'typeorm';
 import { Meeting } from '../meetings/entities/meeting.entity';
 import { Transcription } from '../transcriptions/entities/transcription.entity';
 import { Summary } from '../summaries/entities/summary.entity';
+import { User } from '../auth/entities/user.entity';
 
 // Ensure .env is loaded when this file is imported by the CLI
 dotenv.config();
@@ -31,14 +32,16 @@ export function buildDataSourceOptions(): DataSourceOptions {
     type: 'postgres',
     host: process.env.DB_HOST || 'localhost',
     port: parseInt(process.env.DB_PORT ?? '5432', 10),
-    username: process.env.DB_USERNAME || 'postgres',
+    username: process.env.DB_PASSWORD ? process.env.DB_USERNAME || 'postgres' : process.env.DB_USERNAME,
     password: process.env.DB_PASSWORD || '',
     database: process.env.DB_NAME || 'ai_meeting_assistant',
-    entities: [Meeting, Transcription, Summary],
+    entities: [Meeting, Transcription, Summary, User],
     synchronize: false,
     logging: false,
     ssl:
-      process.env.DB_HOST !== 'localhost' && process.env.DB_HOST !== 'host.docker.internal'
+      process.env.DB_HOST !== 'localhost' &&
+      process.env.DB_HOST !== 'host.docker.internal' &&
+      process.env.DB_HOST !== 'postgres'
         ? { rejectUnauthorized: false }
         : false,
   };

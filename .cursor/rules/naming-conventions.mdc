@@ -1,0 +1,34 @@
+---
+description: File and symbol naming for server, client, and shared types
+alwaysApply: true
+---
+
+# Naming Conventions
+
+## NestJS (`server/`)
+
+Use the feature prefix in every filename:
+
+| File | Pattern | Example |
+|------|---------|---------|
+| Controller | `feature.controller.ts` | `meetings.controller.ts` |
+| Service | `feature.service.ts` | `meetings.service.ts` |
+| Module | `feature.module.ts` | `meetings.module.ts` |
+| DTO | `dto/*.dto.ts` | `transcribe.dto.ts`, `login.dto.ts` |
+| Entity | `entities/*.entity.ts` | `meeting.entity.ts` |
+| Interface | `interfaces/*.interface.ts` | `meeting-response.interface.ts` |
+
+Avoid generic names like `helper.ts`, `utils.ts`, or `misc.ts` without a clear feature prefix.
+
+## Next.js (`client/`)
+
+- **Components** — PascalCase filenames, one component per file (e.g. `MeetingHistory.tsx`).
+- **Hooks** — `useX` naming (e.g. `useAuth.ts`).
+- **Pages/routes** — App Router conventions under `client/src/app/`.
+- **API clients** — `client/src/lib/api/*.api.ts` (e.g. `meetings.api.ts`).
+
+## Cross-app types
+
+- **Server** — request/response shapes in the matching feature's `dto/` or `interfaces/`.
+- **Client** — UI and API consumer types in `client/src/types/`.
+- When both sides need the same contract, keep definitions aligned; do not copy-paste divergent versions.

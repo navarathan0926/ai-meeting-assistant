@@ -1,0 +1,88 @@
+---
+description: Next.js code review standards covering code standards, reusable components, security, performance, and architecture. Apply when reviewing or writing Next.js pages, components, layouts, or API routes.
+globs: ["app/**/*.tsx", "app/**/*.ts", "pages/**/*.tsx", "pages/**/*.ts", "components/**/*.tsx", "**/*.page.tsx"]
+alwaysApply: false
+---
+
+
+# Next.js Code Review
+
+A structured way to review Next.js frontend code across five dimensions: code standards, reusable components, security, performance, and architecture/patterns. Use this skill to produce a consistent, thorough review rather than ad hoc comments.
+
+## How to use this skill
+
+1. **Gather the code.** If files were uploaded, read them. If the user pasted code inline, use that. If you don't have the code yet, ask for it (don't guess).
+2. **Identify scope and router type.** Is this the App Router (`app/`) or Pages Router (`pages/`)? This changes which conventions apply (Server Components vs `getServerSideProps`/`getStaticProps`). Skim the directory structure if reviewing more than one file.
+3. **Walk through each of the five checklist sections below.** Only report findings that actually apply, don't pad the review with boilerplate praise.
+4. **Output format**: group findings by section, and within each finding give: file/line reference, what's wrong, why it matters, and a concrete fix (code snippet when useful). End with a short prioritized summary (Critical / Should Fix / Nice to Have).
+
+Be direct and specific. Skip a section entirely if there's nothing meaningful to say.
+
+## 1. Code Standards
+
+- Consistent TypeScript usage: typed props, typed API responses, no unnecessary `any`.
+- Correct use of Server vs Client Components (App Router): `"use client"` only where actually needed (state, effects, browser APIs, event handlers); avoid making whole trees client components unnecessarily.
+- Naming/file conventions followed: `page.tsx`, `layout.tsx`, `loading.tsx`, `error.tsx` used correctly in App Router; consistent component file naming (PascalCase components, camelCase hooks/utilities).
+- ESLint (`eslint-config-next`) and Prettier respected; no disabled lint rules without justification.
+- Props validated/typed with explicit interfaces, not loose objects; default props handled explicitly.
+- Consistent data-fetching pattern, not a mix of fetch-in-component, custom hooks, and `getServerSideProps` for no clear reason within the same app.
+- No leftover console.logs, commented-out code, or dead imports.
+
+## 2. Reusable Components
+
+- Shared UI (buttons, inputs, cards, modals) extracted into a common components directory rather than duplicated per page/feature.
+- Custom hooks used to share logic (data fetching, form handling, debouncing) instead of copy-pasted `useEffect`/`useState` logic across components.
+- Layout composition (`layout.tsx`, shared headers/footers) used instead of repeating layout markup per page.
+- Design tokens/theme (colors, spacing, typography) centralized (Tailwind config, CSS variables, or a theme file) rather than hardcoded magic values scattered through components.
+- Compound/variant components (e.g. via `class-variance-authority`, or simple prop-based variants) used for components with multiple visual states, instead of many near-duplicate components.
+- Context providers used appropriately for cross-cutting state (auth, theme), not overused for state that should be local or server-fetched.
+
+## 3. Security
+
+- No secrets or API keys in client-side code or `NEXT_PUBLIC_*` env vars unless genuinely safe to expose publicly.
+- Server Actions / API routes validate and sanitize all inputs server-side; never trust client-supplied data (including values from forms or query params) without validation.
+- Authentication/session checks happen on the server (middleware, Server Component, or API route), not only hidden via client-side redirects that can be bypassed.
+- `dangerouslySetInnerHTML` avoided, or if used, content is sanitized (e.g. DOMPurify) to prevent XSS.
+- External links use `rel="noopener noreferrer"` where appropriate; user-generated URLs validated before rendering as links/images.
+- CSRF considerations handled for state-changing requests (Server Actions have built-in protections, but custom API routes should not rely solely on cookies without additional checks).
+- Content Security Policy / security headers configured (via `next.config.js` headers or middleware) rather than left at defaults for production apps.
+- Image sources validated/allow-listed in `next.config.js` `images.domains`/`remotePatterns` rather than allowing arbitrary remote hosts.
+
+## 4. Performance
+
+- `next/image` used for images (with proper `width`/`height` or `fill`, and `priority` only for above-the-fold images) instead of raw `<img>` tags.
+- `next/font` used for font loading instead of manual `<link>` tags or render-blocking font imports.
+- Code splitting / dynamic imports (`next/dynamic`) used for heavy, rarely-needed, or below-the-fold components.
+- Data fetching uses appropriate caching/revalidation strategy (`fetch` cache options, `revalidate`, ISR) rather than defaulting everything to fully dynamic rendering when static/cached would do.
+- Avoid unnecessary client-side fetching waterfalls; parallelize independent requests (`Promise.all`, parallel Server Component fetches) rather than sequential awaits.
+- Bundle size watched: no large libraries imported wholesale when a smaller import or native API would do; check for accidental duplicate dependencies.
+- Memoization (`useMemo`, `useCallback`, `React.memo`) used where it actually prevents meaningful re-renders, not applied reflexively everywhere.
+- Avoid blocking the main thread with expensive client-side computation that could be moved server-side or to a Web Worker.
+
+## 5. Architecture & Patterns
+
+- Clear separation between Server Components (data fetching, layout) and Client Components (interactivity), with client boundaries pushed as far down the tree as possible ("leaf" client components).
+- Routing structure reflects the app's information architecture; route groups/parallel routes/intercepting routes (App Router) used intentionally, not as a workaround for poor structure.
+- State management proportional to need: local state for local concerns, server state via fetching/caching libraries (e.g. React Query/SWR) or Server Components, global client state (Zustand/Redux/Context) reserved for genuinely cross-cutting UI state.
+- API routes/Server Actions organized by domain/feature, with shared validation logic factored out rather than duplicated per route.
+- Environment-specific config (API base URLs, feature flags) centralized and typed, not inlined as string literals across files.
+- Error handling consistent: `error.tsx`/`not-found.tsx` boundaries used in App Router; API routes return consistent error shapes and status codes.
+- Tests exist for critical components/logic (unit tests for hooks/utilities, integration tests for key user flows), and component logic is structured to be testable (logic separated from heavy JSX where reasonable).
+
+## Output template
+
+```
+## Next.js Code Review
+
+### Critical
+- [file:line] Issue. Why it matters. Suggested fix.
+
+### Should Fix
+- ...
+
+### Nice to Have
+- ...
+
+### Summary
+Short paragraph: overall code health, biggest risk, and what to prioritize first.
+```

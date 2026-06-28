@@ -12,6 +12,7 @@ import {
   UseInterceptors,
 } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
+import { Auth } from '../common/decorators/auth.decorator';
 import { MeetingsService } from './meetings.service';
 import { MeetingResponse } from './interfaces/meeting-response.interface';
 import type { Express } from 'express';
@@ -26,6 +27,7 @@ import type { Express } from 'express';
  *
  * No business logic, no validation beyond what decorators provide.
  */
+@Auth()
 @Controller('meetings')
 export class MeetingsController {
   constructor(private readonly meetingsService: MeetingsService) {}
@@ -58,9 +60,7 @@ export class MeetingsController {
    * Optional `search` query param filters by title or original filename (case-insensitive).
    */
   @Get()
-  async findAll(
-    @Query('search') search?: string,
-  ): Promise<MeetingResponse[]> {
+  async findAll(@Query('search') search?: string): Promise<MeetingResponse[]> {
     return this.meetingsService.findAll(search);
   }
 
@@ -84,9 +84,7 @@ export class MeetingsController {
    */
   @Delete(':id')
   @HttpCode(HttpStatus.NO_CONTENT)
-  async remove(
-    @Param('id', ParseUUIDPipe) id: string,
-  ): Promise<void> {
+  async remove(@Param('id', ParseUUIDPipe) id: string): Promise<void> {
     return this.meetingsService.deleteMeeting(id);
   }
 }

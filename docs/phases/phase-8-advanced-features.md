@@ -1,4 +1,4 @@
-# Phase 7 — Advanced Features
+# Phase 8 — Advanced Features
 
 ## Phase Overview
 Add advanced features to enhance the functionality and user experience of the AI Meeting Assistant.
@@ -41,7 +41,7 @@ Add advanced features to enhance the functionality and user experience of the AI
 - **Collaboration**: Role-based access control (RBAC).
 
 ## Dependencies
-- Phases 0–6 must be complete.
+- Phases 0–7 must be complete.
 
 ## Verification Checklist
 - [ ] Real-time transcription works seamlessly.

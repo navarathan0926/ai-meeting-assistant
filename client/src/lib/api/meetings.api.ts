@@ -19,7 +19,7 @@ export const meetingsApi = {
     form.append('audio', file);
 
     const response = await apiClient.post<ApiResponse<Meeting>>(
-      '/api/meetings/upload',
+      '/meetings/upload',
       form,
       { headers: { 'Content-Type': 'multipart/form-data' } },
     );
@@ -29,14 +29,14 @@ export const meetingsApi = {
   /** Fetch a single meeting by ID (used for polling until completed) */
   getById: async (id: string): Promise<Meeting> => {
     const response = await apiClient.get<ApiResponse<Meeting>>(
-      `/api/meetings/${id}`,
+      `/meetings/${id}`,
     );
     return response.data.data;
   },
 
   /** Fetch all meetings ordered by creation date */
   getAll: async (): Promise<Meeting[]> => {
-    const response = await apiClient.get<ApiResponse<Meeting[]>>('/api/meetings');
+    const response = await apiClient.get<ApiResponse<Meeting[]>>('/meetings');
     return response.data.data;
   },
 
@@ -46,6 +46,6 @@ export const meetingsApi = {
    * Server returns 204 No Content.
    */
   delete: async (id: string): Promise<void> => {
-    await apiClient.delete(`/api/meetings/${id}`);
+    await apiClient.delete(`/meetings/${id}`);
   },
 };

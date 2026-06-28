@@ -1,0 +1,93 @@
+---
+description: NestJS code review standards covering code standards, reusable components, security, performance, and architecture. Apply when reviewing or writing NestJS controllers, services, modules, or DTOs.
+globs: ["**/*.controller.ts", "**/*.service.ts", "**/*.module.ts", "**/*.dto.ts", "**/*.entity.ts", "**/*.guard.ts", "**/*.interceptor.ts", "**/*.pipe.ts"]
+alwaysApply: false
+---
+
+
+# NestJS Code Review
+
+A structured way to review NestJS backend code across five dimensions: code standards, reusable components, security, performance, and architecture/patterns. Use this skill to produce a consistent, thorough review rather than ad hoc comments.
+
+## How to use this skill
+
+1. **Gather the code.** If files were uploaded, read them. If the user pasted code inline, use that. If you don't have the code yet, ask for it (don't guess).
+2. **Identify scope.** Is this a single file, a feature module, or the whole app? Skim the directory structure (`view` the folder) if it's a module/app to understand layering (controllers, services, modules, DTOs, guards, interceptors, pipes).
+3. **Walk through each of the five checklist sections below.** For each, only report findings that actually apply, don't pad the review with boilerplate praise.
+4. **Output format**: group findings by section, and within each finding give: file/line reference, what's wrong, why it matters, and a concrete fix (code snippet when useful). End with a short prioritized summary (Critical / Should Fix / Nice to Have).
+
+Be direct and specific. Skip a section entirely if there's nothing meaningful to say, don't manufacture filler feedback.
+
+## 1. Code Standards
+
+- Consistent use of TypeScript: no unnecessary `any`, proper typing of request/response objects, DTOs, and return types of methods.
+- DTOs use `class-validator` / `class-transformer` decorators (`@IsString()`, `@IsEmail()`, etc.) for every input field, not just some.
+- Naming conventions: `*.controller.ts`, `*.service.ts`, `*.module.ts`, `*.dto.ts`, `*.entity.ts`, PascalCase classes, camelCase methods/variables.
+- Controllers stay thin: routing, validation, and delegation only. Business logic belongs in services, not controllers.
+- Consistent error handling: use NestJS built-in exceptions (`BadRequestException`, `NotFoundException`, etc.) instead of throwing raw `Error` or returning ad hoc error shapes.
+- `async/await` used consistently; no mixing of callbacks/promises/`.then()` chains without reason.
+- Linting/formatting: ESLint and Prettier configs present and respected, no commented-out dead code left in.
+- Environment config accessed via `ConfigService` / `@nestjs/config`, not `process.env` scattered through the codebase.
+
+## 2. Reusable Components
+
+- Shared logic (e.g. pagination, response shaping, common validators) extracted into shared modules/providers rather than duplicated across feature modules.
+- Custom decorators (`@CurrentUser()`, `@Roles()`, etc.) used where they reduce repetition, instead of repeating the same `req.user` extraction logic everywhere.
+- Pipes used for transformation/validation (`ParseIntPipe`, custom validation pipes) rather than manual parsing in controllers.
+- Interceptors used for cross-cutting concerns (logging, response transformation, caching) instead of duplicating that logic per-endpoint.
+- Guards centralize auth/role checks rather than inline `if` checks scattered in services/controllers.
+- Common DTOs (e.g. `PaginationDto`, `BaseResponseDto`) reused instead of redefined per module.
+- Barrel files (`index.ts`) used sensibly for clean imports, but not so aggressively that they create circular dependency risk.
+
+## 3. Security
+
+- Input validation enabled globally (`ValidationPipe` with `whitelist: true`, `forbidNonWhitelisted: true`) so unexpected fields are stripped/rejected.
+- Authentication implemented via Passport strategies/guards, not handwritten token parsing.
+- Authorization (role/permission checks) enforced server-side on every protected route, never trusted from the client.
+- Sensitive data (passwords, tokens, secrets) never logged, never returned in API responses, always hashed (e.g. bcrypt/argon2) for passwords.
+- SQL/NoSQL injection risk: ORM/query builder (TypeORM, Prisma, Mongoose) parameterizes queries; no raw string concatenation into queries.
+- CORS configured explicitly, not wide open (`origin: '*'`) in production.
+- Rate limiting / throttling (`@nestjs/throttler` or equivalent) present on auth and other abuse-prone endpoints.
+- Secrets and credentials loaded from environment/secret manager, never hardcoded or committed.
+- Helmet (or equivalent) used for HTTP header hardening; payload size limits set to avoid abuse.
+- File uploads (if any) validate type/size and avoid path traversal.
+
+## 4. Performance
+
+- Database queries avoid N+1 patterns; relations loaded with proper joins/`relations`/`include` rather than looped queries.
+- Pagination implemented for any endpoint returning potentially large lists, never returning unbounded result sets.
+- Indexes exist on columns used in frequent `WHERE`/`ORDER BY` clauses (check entity/schema definitions).
+- Caching (`@nestjs/cache-manager`, Redis, etc.) used for expensive or frequently-repeated reads where appropriate.
+- Heavy/blocking operations (large file processing, image manipulation, etc.) offloaded to queues (Bull/BullMQ) rather than blocking the request thread.
+- No unnecessary synchronous/blocking calls in request lifecycle (e.g. blocking crypto, large in-memory transforms) without justification.
+- Connection pooling configured sensibly for the database driver; no obvious connection leaks (unclosed connections, unawaited promises).
+- Avoid serializing/deserializing unnecessarily large objects per request (over-fetching fields not needed in the response).
+
+## 5. Architecture & Patterns
+
+- Module boundaries reflect feature/domain boundaries, not just technical layers, and circular module dependencies are avoided.
+- Dependency injection used correctly: services injected via constructor, no manual `new Service()` instantiation bypassing the DI container.
+- Single Responsibility respected: services don't span unrelated domains; controllers don't reach into other modules' internals directly (go through the exported service/provider).
+- Repository or data-access pattern used consistently if the app has nontrivial data access, rather than mixing raw ORM calls directly into business logic.
+- Configuration centralized (`ConfigModule`, typed config objects) rather than ad hoc reads scattered through the code.
+- Cross-module communication happens through exported providers / event emitters, not by importing internal files from another module's folder structure.
+- Tests (unit for services, e2e for controllers) exist for core business logic; mocking done through Nest's testing utilities (`Test.createTestingModule`).
+- Versioning/consistency of API responses (a consistent envelope or convention) across the app.
+
+## Output template
+
+```
+## NestJS Code Review
+
+### Critical
+- [file:line] Issue. Why it matters. Suggested fix.
+
+### Should Fix
+- ...
+
+### Nice to Have
+- ...
+
+### Summary
+Short paragraph: overall code health, biggest risk, and what to prioritize first.
+```
