@@ -19,6 +19,7 @@ import { TransformInterceptor } from '../src/common/interceptors/transform.inter
 import { AllExceptionsFilter } from '../src/common/filters/http-exception.filter';
 import { ExtractionController } from '../src/extraction/extraction.controller';
 import { NotFoundException } from '@nestjs/common';
+import { AuthGuard } from '../src/common/guards/auth.guard';
 
 // ── Mock data ──────────────────────────────────────────────────────────────────
 
@@ -79,7 +80,10 @@ async function createTestApp(): Promise<INestApplication> {
       { provide: getRepositoryToken(Meeting), useValue: {} },
       { provide: getQueueToken('extraction'), useValue: mockExtractionQueue },
     ],
-  }).compile();
+  })
+    .overrideGuard(AuthGuard)
+    .useValue({ canActivate: () => true })
+    .compile();
 
   const app = moduleFixture.createNestApplication();
 
