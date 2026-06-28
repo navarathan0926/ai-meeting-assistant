@@ -37,20 +37,20 @@ describe('meetingsApi', () => {
   // ── upload ──────────────────────────────────────────────────────────────────
 
   describe('upload', () => {
-    it('should POST to /api/meetings/upload with FormData and return the meeting', async () => {
+    it('should POST to /meetings/upload with FormData and return the meeting', async () => {
       const meeting = buildMeeting({ status: MeetingStatus.Pending });
-      mock.onPost('/api/meetings/upload').reply(202, wrapInApiResponse(meeting));
+      mock.onPost('/meetings/upload').reply(202, wrapInApiResponse(meeting));
 
       const file = new File([Buffer.from('audio')], 'standup.mp3', { type: 'audio/mpeg' });
       const result = await meetingsApi.upload(file);
 
-      expect(mock.history.post[0].url).toBe('/api/meetings/upload');
+      expect(mock.history.post[0].url).toBe('/meetings/upload');
       expect(result).toEqual(meeting);
     });
 
     it('should set multipart/form-data content type header', async () => {
       const meeting = buildMeeting();
-      mock.onPost('/api/meetings/upload').reply(202, wrapInApiResponse(meeting));
+      mock.onPost('/meetings/upload').reply(202, wrapInApiResponse(meeting));
 
       const file = new File([Buffer.from('audio')], 'meeting.mp3', { type: 'audio/mpeg' });
       await meetingsApi.upload(file);
@@ -60,7 +60,7 @@ describe('meetingsApi', () => {
     });
 
     it('should throw when the server returns an error', async () => {
-      mock.onPost('/api/meetings/upload').reply(400, { message: 'No audio file provided.' });
+      mock.onPost('/meetings/upload').reply(400, { message: 'No audio file provided.' });
 
       const file = new File([], 'bad.txt');
       await expect(meetingsApi.upload(file)).rejects.toThrow();
@@ -70,18 +70,18 @@ describe('meetingsApi', () => {
   // ── getById ─────────────────────────────────────────────────────────────────
 
   describe('getById', () => {
-    it('should GET /api/meetings/:id and return the meeting', async () => {
+    it('should GET /meetings/:id and return the meeting', async () => {
       const meeting = buildMeeting({ status: MeetingStatus.Completed });
-      mock.onGet(`/api/meetings/${VALID_UUID}`).reply(200, wrapInApiResponse(meeting));
+      mock.onGet(`/meetings/${VALID_UUID}`).reply(200, wrapInApiResponse(meeting));
 
       const result = await meetingsApi.getById(VALID_UUID);
 
-      expect(mock.history.get[0].url).toBe(`/api/meetings/${VALID_UUID}`);
+      expect(mock.history.get[0].url).toBe(`/meetings/${VALID_UUID}`);
       expect(result).toEqual(meeting);
     });
 
     it('should throw when meeting is not found (404)', async () => {
-      mock.onGet(`/api/meetings/${VALID_UUID}`).reply(404, {
+      mock.onGet(`/meetings/${VALID_UUID}`).reply(404, {
         message: 'Meeting not found',
         statusCode: 404,
       });
@@ -93,26 +93,26 @@ describe('meetingsApi', () => {
   // ── getAll ──────────────────────────────────────────────────────────────────
 
   describe('getAll', () => {
-    it('should GET /api/meetings and return the array', async () => {
+    it('should GET /meetings and return the array', async () => {
       const meetings = [buildMeeting(), buildMeeting({ id: 'uuid-5678' })];
-      mock.onGet('/api/meetings').reply(200, wrapInApiResponse(meetings));
+      mock.onGet('/meetings').reply(200, wrapInApiResponse(meetings));
 
       const result = await meetingsApi.getAll();
 
-      expect(mock.history.get[0].url).toBe('/api/meetings');
+      expect(mock.history.get[0].url).toBe('/meetings');
       expect(result).toEqual(meetings);
       expect(result).toHaveLength(2);
     });
 
     it('should return an empty array when no meetings exist', async () => {
-      mock.onGet('/api/meetings').reply(200, wrapInApiResponse([]));
+      mock.onGet('/meetings').reply(200, wrapInApiResponse([]));
 
       const result = await meetingsApi.getAll();
       expect(result).toEqual([]);
     });
 
     it('should throw on network error', async () => {
-      mock.onGet('/api/meetings').networkError();
+      mock.onGet('/meetings').networkError();
 
       await expect(meetingsApi.getAll()).rejects.toThrow();
     });
@@ -121,17 +121,17 @@ describe('meetingsApi', () => {
   // ── delete ──────────────────────────────────────────────────────────────────
 
   describe('delete', () => {
-    it('should DELETE /api/meetings/:id and resolve with void', async () => {
-      mock.onDelete(`/api/meetings/${VALID_UUID}`).reply(204);
+    it('should DELETE /meetings/:id and resolve with void', async () => {
+      mock.onDelete(`/meetings/${VALID_UUID}`).reply(204);
 
       const result = await meetingsApi.delete(VALID_UUID);
 
-      expect(mock.history.delete[0].url).toBe(`/api/meetings/${VALID_UUID}`);
+      expect(mock.history.delete[0].url).toBe(`/meetings/${VALID_UUID}`);
       expect(result).toBeUndefined();
     });
 
     it('should throw when meeting is not found (404)', async () => {
-      mock.onDelete(`/api/meetings/${VALID_UUID}`).reply(404, {
+      mock.onDelete(`/meetings/${VALID_UUID}`).reply(404, {
         message: 'Not found',
       });
 
