@@ -6,6 +6,7 @@ import {
 } from '@nestjs/common';
 import { InjectQueue } from '@nestjs/bullmq';
 import { Queue } from 'bullmq';
+import { Auth } from '../common/decorators/auth.decorator';
 
 
 export interface JobStatusResponse {
@@ -18,6 +19,7 @@ export interface JobStatusResponse {
 }
 
 
+@Auth()
 @Controller('extraction')
 export class ExtractionController {
   constructor(

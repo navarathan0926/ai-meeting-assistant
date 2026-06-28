@@ -1,0 +1,34 @@
+---
+description: Code style — small functions, early returns, no duplicated logic
+alwaysApply: true
+---
+
+# Code Style
+
+## Functions and control flow
+
+- Prefer **small, focused functions** over long ones.
+- **Flag functions over ~40 lines** for potential splitting during review or refactor.
+- Avoid deeply nested conditionals; use **early returns** instead.
+
+## Shared logic
+
+- Do **not** duplicate business logic between `server/` and `client/`.
+- Business rules belong in `server/src/<feature>/*.service.ts`.
+- Client code fetches and displays data; it does not reimplement server-side rules.
+
+## Readability
+
+- Favor readability over cleverness.
+- Avoid one-liners that sacrifice clarity.
+- Match existing conventions in the file or module before introducing new patterns.
+
+## NestJS (`server/`)
+
+- Keep controllers thin: validate input, delegate to services, map responses.
+- Inject dependencies; avoid static helpers for domain logic that belongs in a service.
+
+## Next.js (`client/`)
+
+- Colocate component-specific hooks next to the component or under `hooks/` when reused.
+- Keep HTTP calls in `client/src/lib/api/`; use the shared axios instance in `lib/axios.ts`.

@@ -1,4 +1,4 @@
-# Phase 8 — Security & Performance
+# Phase 7 — Security & Performance
 
 ## Phase Overview
 Ensure the AI Meeting Assistant is secure and performs optimally under load.
@@ -38,7 +38,7 @@ Ensure the AI Meeting Assistant is secure and performs optimally under load.
 - **Performance**: Redis, CDN.
 
 ## Dependencies
-- Phases 0–7 must be complete.
+- Phases 0–6 must be complete.
 
 ## Verification Checklist
 - [ ] Authentication and authorization are secure.

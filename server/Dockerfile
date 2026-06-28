@@ -1,31 +1,20 @@
-# FROM node:20-alpine
-
-# WORKDIR /app
-
-# COPY package*.json ./
-
-# RUN npm install
-
-# COPY . .
-
-# EXPOSE 4000
-
-# CMD ["npm", "run", "start:dev"]
-
-
-# Build stage
-FROM node:20-alpine AS builder
+FROM node:20-alpine AS deps
 WORKDIR /app
 COPY package*.json ./
 RUN npm ci
+
+FROM node:20-alpine AS builder
+WORKDIR /app
+COPY --from=deps /app/node_modules ./node_modules
 COPY . .
 RUN npm run build
 
-# Production stage
 FROM node:20-alpine AS production
 WORKDIR /app
 COPY package*.json ./
-RUN npm ci --only=production
+COPY --from=deps /app/node_modules ./node_modules
+RUN npm prune --production
 COPY --from=builder /app/dist ./dist
+
 EXPOSE 4000
-CMD ["node", "dist/main"]
+CMD ["sh", "-c", "npx typeorm migration:run -d dist/database/data-source.js && exec node dist/main"]

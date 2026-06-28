@@ -1,18 +1,8 @@
 import type { Metadata } from 'next';
-import { Geist, Geist_Mono } from 'next/font/google';
 import { QueryProvider } from '@/providers/QueryProvider';
 import { ToastProvider } from '@/providers/ToastProvider';
+import { AuthProvider } from '@/providers/AuthProvider';
 import './globals.css';
-
-const geistSans = Geist({
-  variable: '--font-geist-sans',
-  subsets: ['latin'],
-});
-
-const geistMono = Geist_Mono({
-  variable: '--font-geist-mono',
-  subsets: ['latin'],
-});
 
 export const metadata: Metadata = {
   title: 'AI Meeting Assistant',
@@ -28,14 +18,22 @@ export default function RootLayout({
   return (
     <html
       lang="en"
-      className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
+      className="h-full antialiased"
+      style={{
+        fontFamily: 'Geist, system-ui, -apple-system, sans-serif',
+        // Support custom variables in css
+        ['--font-geist-sans' as any]: 'Geist, system-ui, sans-serif',
+        ['--font-geist-mono' as any]: 'Geist Mono, monospace',
+      }}
     >
       <body className="min-h-full flex flex-col">
         {/* QueryProvider must wrap everything that uses React Query hooks */}
         <QueryProvider>
-          <ToastProvider>
-            {children}
-          </ToastProvider>
+          <AuthProvider>
+            <ToastProvider>
+              {children}
+            </ToastProvider>
+          </AuthProvider>
         </QueryProvider>
       </body>
     </html>

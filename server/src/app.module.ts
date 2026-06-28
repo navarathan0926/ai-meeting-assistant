@@ -8,6 +8,7 @@ import { MeetingsModule } from './meetings/meetings.module';
 import { HealthController } from './health/health.controller';
 import { LoggerMiddleware } from './common/middleware/logger.middleware';
 import { ExtractionModule } from './extraction/extraction.module';
+import { AuthModule } from './auth/auth.module';
 
 @Module({
   imports: [
@@ -26,6 +27,7 @@ import { ExtractionModule } from './extraction/extraction.module';
     DatabaseModule,
     MeetingsModule,
     ExtractionModule,
+    AuthModule,
   ],
   controllers: [AppController, HealthController],
   providers: [AppService],

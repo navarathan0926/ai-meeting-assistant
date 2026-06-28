@@ -1,0 +1,48 @@
+---
+description: NestJS server conventions — controllers, services, modules
+globs: server/**/*.{ts,tsx}
+alwaysApply: false
+---
+
+# NestJS Server Conventions
+
+Applies to `server/`.
+
+## Feature module checklist
+
+Each feature folder under `server/src/` should include:
+
+- `*.module.ts` — registers controller, service, and imports
+- `*.controller.ts` — HTTP routes only
+- `*.service.ts` — business logic
+- `dto/` — request validation classes
+- `entities/` — TypeORM entities (when persisted)
+- `interfaces/` — response/API shapes (optional, when not covered by DTOs)
+
+Infrastructure modules (`database/`, `storage/`, `common/`) follow the same naming pattern but may omit controllers or entities.
+
+## Controller rules
+
+```typescript
+// ✅ GOOD — delegate to service
+@Post()
+create(@Body() dto: CreateMeetingDto) {
+  return this.meetingsService.create(dto);
+}
+
+// ❌ BAD — business logic in controller
+@Post()
+create(@Body() dto: CreateMeetingDto) {
+  const meeting = this.repo.create(dto);
+  return this.repo.save(meeting);
+}
+```
+
+## Common code
+
+Place guards, pipes, filters, interceptors, middleware, and decorators in `server/src/common/`, not inside feature modules unless feature-specific.
+
+## Service rules
+
+- One primary responsibility per service.
+- Split when handling unrelated domains (e.g. `MeetingsService` vs `BlobStorageService` in `storage/`).

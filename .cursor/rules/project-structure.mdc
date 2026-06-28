@@ -1,0 +1,52 @@
+---
+description: Project layout — NestJS server, Next.js client, Docker, docs
+alwaysApply: true
+---
+
+# Project Structure
+
+This repo has two apps at the root (see `README.md` and `docs/phases/`):
+
+| Path | Role |
+|------|------|
+| `server/` | NestJS backend (API on port 4000, `/api` prefix) |
+| `client/` | Next.js frontend (port 3000) |
+| `server/src/common/` | Cross-cutting NestJS code (guards, pipes, filters, interceptors, middleware) |
+| `server/src/database/` | TypeORM config, migrations |
+| `client/src/types/` | Frontend TypeScript interfaces |
+| `ai-agents/` | AI agent pipeline (analyzer, refactorer, orchestrator, etc.) |
+| `docs/phases/` | Phase-by-phase implementation docs |
+
+There is **no** `apps/api`, `apps/web`, or `packages/` workspace today. Use `server/` and `client/` paths in all code and docs.
+
+## Docker
+
+Root `docker-compose.yml` defines services **`server`** and **`client`**. After structural changes, verify with:
+
+```bash
+docker-compose up --build -d
+docker-compose exec server npm run migration:run:prod   # if schema changed
+```
+
+## NestJS feature modules
+
+Organize by **feature/domain**, not by layer. Feature folders live directly under `server/src/`:
+
+```
+server/src/meetings/
+├── meetings.controller.ts
+├── meetings.service.ts
+├── meetings.module.ts
+├── dto/
+├── entities/
+├── interfaces/    # response shapes when needed
+└── enums/         # domain enums when needed
+```
+
+Existing features include `meetings/`, `transcriptions/`, `summaries/`, `auth/`, `storage/`, `extraction/`, `health/`, and `ai-agents/`.
+
+## Layer responsibilities
+
+- **Controllers** — routing and request validation only. No business logic.
+- **Services** — business logic. One responsibility per service; split when a service does more than one job.
+- **Shared API contracts** — server shapes in `dto/` and `interfaces/`; client shapes in `client/src/types/`. Do not duplicate or drift; keep field names aligned.

@@ -1,0 +1,32 @@
+---
+description: Refactoring rules — preserve behavior, one module at a time
+alwaysApply: true
+---
+
+# Refactoring Rules
+
+## Preserve behavior
+
+- **Do not change behavior** while refactoring structure.
+- **Flag any structural change** that risks altering runtime behavior (e.g. middleware order, transaction boundaries, auth guards, BullMQ/Redis processors, env-dependent paths, Docker volume mounts).
+
+## Scope
+
+- Refactor **one module/feature at a time** (e.g. only `server/src/meetings/` or one client component tree), not the whole codebase in a single change.
+- Finish and verify one feature before starting the next.
+
+## After each module refactor
+
+Provide a short summary so the user can verify build and Docker:
+
+1. **What moved** — list files/folders with old → new paths.
+2. **Why** — one line per move (e.g. "dto colocated with feature", "response interface aligned with client type").
+3. **Verify** — suggest running:
+   - `cd server && npm run build` (or `npm run start:dev`)
+   - `cd client && npm run build` (or `npm run dev`)
+   - `docker-compose up --build` if Dockerfiles or `docker-compose.yml` changed
+
+## Do not rename root folders
+
+- Keep **`server/`** and **`client/`** as the canonical app paths unless the user explicitly requests a rename.
+- Do not introduce `apps/api` or `apps/web` paths without an explicit migration plan.

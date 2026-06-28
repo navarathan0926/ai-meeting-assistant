@@ -8,6 +8,7 @@ import { StorageModule } from '../storage/storage.module';
 import { ExtractionService } from './extraction.service';
 import { ExtractionProcessor } from './extraction.processor';
 import { ExtractionController } from './extraction.controller';
+import { AuthModule } from '../auth/auth.module';
 
 @Module({
   imports: [
@@ -24,6 +25,7 @@ import { ExtractionController } from './extraction.controller';
     TranscriptionsModule,
     SummariesModule,
     StorageModule,
+    AuthModule,
   ],
   controllers: [ExtractionController],
   providers: [ExtractionService, ExtractionProcessor],

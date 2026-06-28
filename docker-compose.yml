@@ -1,51 +1,48 @@
 services:
-  # ─── NestJS Backend ──────────────────────────────────────────────────────────
+  redis:
+    image: redis:7-alpine
+    container_name: meeting_assistant_redis
+    restart: unless-stopped
+    volumes:
+      - redis-data:/data
+
   server:
     build:
       context: ./server
       dockerfile: Dockerfile
     container_name: meeting_assistant_server
-    restart: always
+    restart: unless-stopped
     ports:
-      - "4000:4000"
+      - '4000:4000'
     env_file:
-      - ./server/.env          # provides all DB_*, OPENAI_*, AZURE_* etc.
+      - ./server/.env
     environment:
+      NODE_ENV: development
       PORT: 4000
-      DB_HOST: host.docker.internal  # Connects to localhost PostgreSQL on your Windows machine
-    volumes:
-      - server_uploads:/app/uploads
+      # Reach PostgreSQL running on the host machine (credentials from server/.env)
+      DB_HOST: host.docker.internal
+      REDIS_URL: redis://redis:6379
+      CLIENT_URL: http://localhost:3000
+    extra_hosts:
+      - 'host.docker.internal:host-gateway'
     depends_on:
-      - redis
+      redis:
+        condition: service_started
 
-
-  # ─── Redis Queue ─────────────────────────────────────────────────────────────
-  redis:
-    image: redis:7-alpine
-    container_name: meeting_assistant_redis
-    restart: always
-    ports:
-      - "6380:6379"
-    volumes:
-      - redis_data:/data
-
-  # ─── Next.js Frontend ────────────────────────────────────────────────────────
   client:
     build:
       context: ./client
       dockerfile: Dockerfile
       args:
-        NEXT_PUBLIC_API_URL: http://localhost:4000/
+        NEXT_PUBLIC_API_URL: http://localhost:4000/api
     container_name: meeting_assistant_client
-    restart: always
+    restart: unless-stopped
     ports:
-      - "3000:3000"
+      - '3000:3000'
     environment:
       PORT: 3000
-      NEXT_PUBLIC_API_URL: http://localhost:4000/
     depends_on:
       - server
 
 volumes:
-  server_uploads:
-  redis_data:
+  redis-data:

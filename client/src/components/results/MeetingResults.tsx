@@ -33,7 +33,7 @@ export function MeetingResults({ meeting }: MeetingResultsProps) {
         <span className="text-2xl">✅</span>
         <div>
           <h2 className="font-semibold text-white">{originalFileName}</h2>
-          {transcription?.durationSeconds && (
+          {transcription?.durationSeconds !== undefined && transcription?.durationSeconds !== null && (
             <p className="text-white/40 text-xs mt-0.5">
               Duration: {formatDuration(transcription.durationSeconds)}
             </p>

@@ -1,0 +1,40 @@
+---
+description: Next.js client conventions — components, hooks, API layer
+globs: client/**/*.{ts,tsx}
+alwaysApply: false
+---
+
+# Next.js Client Conventions
+
+Applies to `client/`.
+
+## Components
+
+- **PascalCase** filenames: `MeetingResults.tsx`, `ConfirmationModal.tsx`.
+- **One component per file**; default export or named export for the primary component.
+- Presentational components must not contain business rules — use hooks or `lib/` helpers.
+
+## Hooks
+
+- Prefix with `use`: `useAuth.ts`.
+- Custom hooks encapsulate data fetching, form state, and side effects.
+- Reusable hooks live in `client/src/hooks/`; component-specific hooks may colocate with the component.
+
+## Types and API
+
+- UI and API consumer types live in `client/src/types/` (e.g. `meeting.ts`).
+- Keep types aligned with server `dto/` and `interfaces/`; do not redefine divergent contract shapes.
+- HTTP calls belong in `client/src/lib/api/` (e.g. `meetings.api.ts`, `auth.ts`).
+- Use the shared axios instance from `client/src/lib/axios.ts`.
+
+## Layout (from README)
+
+```
+client/src/
+├── app/           # App Router pages & layouts
+├── components/    # Shared UI (PascalCase)
+├── hooks/         # useX hooks
+├── lib/           # axios, api clients, auth helpers
+├── providers/     # QueryProvider, AuthProvider, etc.
+└── types/         # TypeScript interfaces
+```

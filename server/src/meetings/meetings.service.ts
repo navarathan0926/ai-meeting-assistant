@@ -7,7 +7,7 @@ import {
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import * as path from 'path';
-import { v4 as uuidv4 } from 'uuid';
+import { randomUUID } from 'crypto';
 import { Meeting } from './entities/meeting.entity';
 import { MeetingStatus } from './enums/meeting-status.enum';
 import { MeetingResponse } from './interfaces/meeting-response.interface';
@@ -77,7 +77,7 @@ export class MeetingsService {
 
     const jobId = await this.extractionService.addExtractJob(
       saved.id,
-      storedFileName,
+      saved.storedFileName,
     );
 
     return this.toResponse(saved, jobId);
@@ -161,7 +161,7 @@ export class MeetingsService {
 
   private buildStoredFileName(file: Express.Multer.File): string {
     const ext = path.extname(file.originalname).toLowerCase();
-    return `${uuidv4()}${ext}`;
+    return `${randomUUID()}${ext}`;
   }
 
 
