@@ -9,10 +9,9 @@ import {
   ReactNode,
 } from 'react';
 import { useRouter } from 'next/navigation';
+import { useQueryClient } from '@tanstack/react-query';
 import apiClient from '@/lib/axios';
 import { getToken, setToken, removeToken } from '@/lib/auth';
-
-// ─── Types ────────────────────────────────────────────────────────────────────
 
 interface AuthUser {
   id: string;
@@ -29,18 +28,14 @@ interface AuthContextValue {
   logout: () => void;
 }
 
-// ─── Context ──────────────────────────────────────────────────────────────────
-
 const AuthContext = createContext<AuthContextValue | null>(null);
-
-// ─── Provider ─────────────────────────────────────────────────────────────────
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const router = useRouter();
+  const queryClient = useQueryClient();
   const [user, setUser] = useState<AuthUser | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
-  // On mount, validate the stored token against the server
   useEffect(() => {
     const token = getToken();
     if (!token) {
@@ -62,16 +57,21 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       });
   }, []);
 
-  const login = useCallback((token: string, userData: AuthUser) => {
-    setToken(token);
-    setUser(userData);
-  }, []);
+  const login = useCallback(
+    (token: string, userData: AuthUser) => {
+      queryClient.clear();
+      setToken(token);
+      setUser(userData);
+    },
+    [queryClient],
+  );
 
   const logout = useCallback(() => {
+    queryClient.clear();
     removeToken();
     setUser(null);
     router.push('/login');
-  }, [router]);
+  }, [queryClient, router]);
 
   return (
     <AuthContext.Provider
@@ -87,8 +87,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     </AuthContext.Provider>
   );
 }
-
-// ─── Hook ─────────────────────────────────────────────────────────────────────
 
 export function useAuthContext(): AuthContextValue {
   const ctx = useContext(AuthContext);

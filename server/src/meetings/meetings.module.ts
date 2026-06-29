@@ -1,4 +1,4 @@
-import { Module } from '@nestjs/common';
+import { Module, forwardRef } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { Meeting } from './entities/meeting.entity';
 import { MeetingsController } from './meetings.controller';
@@ -9,21 +9,17 @@ import { StorageModule } from '../storage/storage.module';
 import { ExtractionModule } from '../extraction/extraction.module';
 import { AuthModule } from '../auth/auth.module';
 
-/**
- * MeetingsModule
- * Imports Transcriptions and Summaries modules so the MeetingsService
- * can inject their services without coupling directly to their internals.
- */
 @Module({
   imports: [
     TypeOrmModule.forFeature([Meeting]),
     TranscriptionsModule,
     SummariesModule,
     StorageModule,
-    ExtractionModule,
+    forwardRef(() => ExtractionModule),
     AuthModule,
   ],
   controllers: [MeetingsController],
   providers: [MeetingsService],
+  exports: [MeetingsService],
 })
 export class MeetingsModule {}

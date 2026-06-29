@@ -17,7 +17,6 @@ import { BlobStorageService } from '../storage/blob-storage.service';
 import { ExtractionService } from '../extraction/extraction.service';
 import type { Express } from 'express';
 
-
 const ALLOWED_MIME_TYPES = [
   'audio/mpeg',
   'audio/mp4',
@@ -25,12 +24,10 @@ const ALLOWED_MIME_TYPES = [
   'audio/webm',
   'audio/ogg',
   'audio/x-m4a',
-  'video/mp4', // some recorders save .mp4
+  'video/mp4',
 ];
 
-
 const MAX_FILE_SIZE_BYTES = 25 * 1024 * 1024;
-
 
 @Injectable()
 export class MeetingsService {
@@ -43,37 +40,34 @@ export class MeetingsService {
     private readonly summariesService: SummariesService,
     private readonly blobStorageService: BlobStorageService,
     private readonly extractionService: ExtractionService,
-  ) { }
+  ) {}
 
-
-
-
-  async createFromUpload(file: Express.Multer.File): Promise<MeetingResponse> {
+  async createFromUpload(
+    file: Express.Multer.File,
+    userId: string,
+  ): Promise<MeetingResponse> {
     this.validateFile(file);
 
     const storedFileName = this.buildStoredFileName(file);
-
 
     await this.blobStorageService.uploadBuffer(storedFileName, file.buffer, {
       contentType: file.mimetype,
     });
     this.logger.log(`File uploaded to Blob Storage: ${storedFileName}`);
 
-
     const title = path.basename(
       file.originalname,
       path.extname(file.originalname),
     );
-
 
     const meeting = this.meetingRepository.create({
       originalFileName: file.originalname,
       title,
       storedFileName,
       status: MeetingStatus.PENDING,
+      userId,
     });
     const saved = await this.meetingRepository.save(meeting);
-
 
     const jobId = await this.extractionService.addExtractJob(
       saved.id,
@@ -83,10 +77,9 @@ export class MeetingsService {
     return this.toResponse(saved, jobId);
   }
 
-
-  async findOne(id: string): Promise<MeetingResponse> {
+  async findOne(userId: string, id: string): Promise<MeetingResponse> {
     const meeting = await this.meetingRepository.findOne({
-      where: { id },
+      where: { id, userId },
       relations: ['transcription', 'summary'],
     });
     if (!meeting) {
@@ -95,16 +88,16 @@ export class MeetingsService {
     return this.toResponse(meeting);
   }
 
-
-  async findAll(search?: string): Promise<MeetingResponse[]> {
+  async findAll(userId: string, search?: string): Promise<MeetingResponse[]> {
     const qb = this.meetingRepository
       .createQueryBuilder('meeting')
       .leftJoinAndSelect('meeting.transcription', 'transcription')
       .leftJoinAndSelect('meeting.summary', 'summary')
+      .where('meeting.userId = :userId', { userId })
       .orderBy('meeting.createdAt', 'DESC');
 
     if (search?.trim()) {
-      qb.where(
+      qb.andWhere(
         '(meeting.title ILIKE :q OR meeting.originalFileName ILIKE :q)',
         { q: `%${search.trim()}%` },
       );
@@ -114,13 +107,13 @@ export class MeetingsService {
     return Promise.all(meetings.map((m) => this.toResponse(m)));
   }
 
-
-  async deleteMeeting(id: string): Promise<void> {
-    const meeting = await this.meetingRepository.findOne({ where: { id } });
+  async deleteMeeting(userId: string, id: string): Promise<void> {
+    const meeting = await this.meetingRepository.findOne({
+      where: { id, userId },
+    });
     if (!meeting) {
       throw new NotFoundException(`Meeting with id "${id}" not found.`);
     }
-
 
     try {
       await this.blobStorageService.deleteBlob(meeting.storedFileName);
@@ -130,17 +123,20 @@ export class MeetingsService {
       );
     }
 
-
-    await this.transcriptionsService.deleteByMeetingId(id);
-    await this.summariesService.deleteByMeetingId(id);
-
     await this.meetingRepository.delete(id);
     this.logger.log(`Meeting ${id} deleted.`);
   }
 
-
-
-
+  async assertOwned(userId: string, meetingId: string): Promise<void> {
+    const exists = await this.meetingRepository.exists({
+      where: { id: meetingId, userId },
+    });
+    if (!exists) {
+      throw new NotFoundException(
+        `Meeting with id "${meetingId}" not found.`,
+      );
+    }
+  }
 
   private validateFile(file: Express.Multer.File): void {
     if (!file) {
@@ -152,18 +148,14 @@ export class MeetingsService {
       );
     }
     if (file.size > MAX_FILE_SIZE_BYTES) {
-      throw new BadRequestException(
-        `File too large. Maximum size is 25 MB.`,
-      );
+      throw new BadRequestException(`File too large. Maximum size is 25 MB.`);
     }
   }
-
 
   private buildStoredFileName(file: Express.Multer.File): string {
     const ext = path.extname(file.originalname).toLowerCase();
     return `${randomUUID()}${ext}`;
   }
-
 
   private toResponse(meeting: Meeting, jobId?: string): MeetingResponse {
     let audioUrl: string | undefined;

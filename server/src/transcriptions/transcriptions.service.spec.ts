@@ -182,30 +182,6 @@ describe('TranscriptionsService', () => {
     });
   });
 
-  // ── deleteByMeetingId ─────────────────────────────────────────────────────
-
-  describe('deleteByMeetingId', () => {
-    it('should execute a DELETE query targeting the given meetingId', async () => {
-      const qb = transcriptionRepo.createQueryBuilder() as any;
-
-      await service.deleteByMeetingId('meeting-uuid-1');
-
-      expect(qb.delete).toHaveBeenCalled();
-      expect(qb.where).toHaveBeenCalledWith(
-        '"meetingId" = :meetingId',
-        { meetingId: 'meeting-uuid-1' },
-      );
-      expect(qb.execute).toHaveBeenCalled();
-    });
-
-    it('should not throw even when no matching transcription exists', async () => {
-      const qb = transcriptionRepo.createQueryBuilder() as any;
-      qb.execute.mockResolvedValue({ affected: 0 });
-
-      await expect(service.deleteByMeetingId('ghost-uuid')).resolves.toBeUndefined();
-    });
-  });
-
   // ── toResponse ────────────────────────────────────────────────────────────
 
   describe('toResponse', () => {

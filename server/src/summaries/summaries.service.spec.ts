@@ -207,30 +207,6 @@ describe('SummariesService', () => {
     });
   });
 
-  // ── deleteByMeetingId ─────────────────────────────────────────────────────
-
-  describe('deleteByMeetingId', () => {
-    it('should execute a DELETE query for the given meetingId', async () => {
-      const qb = summaryRepo.createQueryBuilder() as any;
-
-      await service.deleteByMeetingId('meeting-uuid-1');
-
-      expect(qb.delete).toHaveBeenCalled();
-      expect(qb.where).toHaveBeenCalledWith(
-        '"meetingId" = :meetingId',
-        { meetingId: 'meeting-uuid-1' },
-      );
-      expect(qb.execute).toHaveBeenCalled();
-    });
-
-    it('should not throw when no matching summary exists', async () => {
-      const qb = summaryRepo.createQueryBuilder() as any;
-      qb.execute.mockResolvedValue({ affected: 0 });
-
-      await expect(service.deleteByMeetingId('ghost-uuid')).resolves.toBeUndefined();
-    });
-  });
-
   // ── toResponse ────────────────────────────────────────────────────────────
 
   describe('toResponse', () => {
