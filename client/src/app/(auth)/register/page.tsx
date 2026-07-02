@@ -8,6 +8,9 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useRegister } from '@/hooks/useAuth';
 import { useAuthContext } from '@/providers/AuthProvider';
+import { getApiErrorCode, getApiErrorMessage } from '@/lib/api/auth-errors';
+import { GOOGLE_AUTH_URL } from '@/lib/auth-urls';
+import { AUTH_ERROR_CODES } from '@/types/auth';
 
 // ─── Schema ───────────────────────────────────────────────────────────────────
 
@@ -70,6 +73,7 @@ export default function RegisterPage() {
   const { mutate: registerMutate, isPending, error } = useRegister();
   const [showPassword, setShowPassword] = useState(false);
   const [password, setPassword] = useState('');
+  const [highlightGoogle, setHighlightGoogle] = useState(false);
 
   useEffect(() => {
     if (!isLoading && isAuthenticated) {
@@ -88,17 +92,25 @@ export default function RegisterPage() {
   });
 
   const onSubmit = (data: RegisterFormValues) => {
-    registerMutate({ name: data.name, email: data.email, password: data.password });
+    setHighlightGoogle(false);
+    registerMutate(
+      { name: data.name, email: data.email, password: data.password },
+      {
+        onError: (submitError) => {
+          if (
+            getApiErrorCode(submitError) ===
+            AUTH_ERROR_CODES.GOOGLE_ACCOUNT_EXISTS
+          ) {
+            setHighlightGoogle(true);
+          }
+        },
+      },
+    );
   };
 
   const apiError =
-    error && (error as any).response?.data?.message
-      ? (error as any).response.data.message
-      : error
-      ? 'Registration failed. Please try again.'
-      : null;
-
-  const GOOGLE_AUTH_URL = `${process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:3001'}/auth/google`;
+    getApiErrorMessage(error) ??
+    (error ? 'Registration failed. Please try again.' : null);
 
   return (
     <div className="auth-card">
@@ -111,7 +123,11 @@ export default function RegisterPage() {
       <p className="auth-subtitle">Start transcribing your meetings with AI</p>
 
       {/* Google OAuth */}
-      <a href={GOOGLE_AUTH_URL} className="btn-google" id="btn-google-register">
+      <a
+        href={GOOGLE_AUTH_URL}
+        className={`btn-google${highlightGoogle ? ' btn-google--highlight' : ''}`}
+        id="btn-google-register"
+      >
         <GoogleIcon />
         <span>Continue with Google</span>
       </a>

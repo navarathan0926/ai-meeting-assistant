@@ -5,6 +5,7 @@ import { JwtModule } from '@nestjs/jwt';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 
 import { AuthService } from './auth.service';
+import { AuthOauthCodeService } from './auth-oauth-code.service';
 import { AuthController } from './auth.controller';
 import { User } from './entities/user.entity';
 import { JwtStrategy } from './strategies/jwt.strategy';
@@ -26,7 +27,13 @@ import { AuthGuard } from '../common/guards/auth.guard';
       }),
     }),
   ],
-  providers: [AuthService, JwtStrategy, GoogleStrategy, AuthGuard],
+  providers: [
+    AuthService,
+    AuthOauthCodeService,
+    JwtStrategy,
+    GoogleStrategy,
+    AuthGuard,
+  ],
   controllers: [AuthController],
   exports: [
     AuthService,

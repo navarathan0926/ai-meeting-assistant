@@ -2,6 +2,7 @@ import { Injectable } from '@nestjs/common';
 import { PassportStrategy } from '@nestjs/passport';
 import { Strategy, VerifyCallback } from 'passport-google-oauth20';
 import { ConfigService } from '@nestjs/config';
+import { UnauthorizedException } from '@nestjs/common';
 
 @Injectable()
 export class GoogleStrategy extends PassportStrategy(Strategy, 'google') {
@@ -14,7 +15,7 @@ export class GoogleStrategy extends PassportStrategy(Strategy, 'google') {
         'MISSING_CLIENT_SECRET',
       callbackURL:
         configService.get<string>('GOOGLE_CALLBACK_URL') ??
-        'http://localhost:3001/auth/google/callback',
+        'http://localhost:4000/api/auth/google/callback',
       scope: ['email', 'profile'],
     });
   }
@@ -24,13 +25,24 @@ export class GoogleStrategy extends PassportStrategy(Strategy, 'google') {
     _refreshToken: string,
     profile: {
       id: string;
-      emails?: { value: string }[];
+      emails?: { value: string; verified?: boolean }[];
       displayName: string;
     },
     done: VerifyCallback,
   ): Promise<void> {
-    const { id, emails, displayName } = profile;
-    const email = emails?.[0]?.value ?? '';
-    done(null, { googleId: id, email, name: displayName });
+    const emailEntry = profile.emails?.[0];
+    if (!emailEntry?.value || !emailEntry.verified) {
+      return done(
+        new UnauthorizedException('Google email not verified'),
+        false,
+      );
+    }
+
+    const { id, displayName } = profile;
+    done(null, {
+      googleId: id,
+      email: emailEntry.value,
+      name: displayName,
+    });
   }
 }

@@ -2,7 +2,8 @@
 
 import { useMutation } from '@tanstack/react-query';
 import { useRouter } from 'next/navigation';
-import { registerUser, loginUser, RegisterPayload, LoginPayload } from '@/lib/api/auth';
+import { registerUser, loginUser } from '@/lib/api/auth';
+import { RegisterPayload, LoginPayload } from '@/types/auth';
 import { useAuthContext } from '@/providers/AuthProvider';
 
 // ─── useRegister ──────────────────────────────────────────────────────────────

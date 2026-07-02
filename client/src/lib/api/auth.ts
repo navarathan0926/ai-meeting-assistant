@@ -1,27 +1,10 @@
 import apiClient from '@/lib/axios';
+import {
+  AuthResult,
+  RegisterPayload,
+  LoginPayload,
+} from '@/types/auth';
 
-export interface AuthResult {
-  accessToken: string;
-  user: {
-    id: string;
-    email: string;
-    name: string;
-    provider: string;
-  };
-}
-
-export interface RegisterPayload {
-  name: string;
-  email: string;
-  password: string;
-}
-
-export interface LoginPayload {
-  email: string;
-  password: string;
-}
-
-// Server wraps all responses in { data: <payload>, statusCode, timestamp }
 interface ApiEnvelope<T> {
   data: T;
   statusCode: number;
@@ -29,11 +12,25 @@ interface ApiEnvelope<T> {
 }
 
 export async function registerUser(payload: RegisterPayload): Promise<AuthResult> {
-  const res = await apiClient.post<ApiEnvelope<AuthResult>>('/auth/register', payload);
+  const res = await apiClient.post<ApiEnvelope<AuthResult>>(
+    '/auth/register',
+    payload,
+  );
   return res.data.data;
 }
 
 export async function loginUser(payload: LoginPayload): Promise<AuthResult> {
-  const res = await apiClient.post<ApiEnvelope<AuthResult>>('/auth/login', payload);
+  const res = await apiClient.post<ApiEnvelope<AuthResult>>(
+    '/auth/login',
+    payload,
+  );
+  return res.data.data;
+}
+
+export async function exchangeOAuthCode(code: string): Promise<AuthResult> {
+  const res = await apiClient.post<ApiEnvelope<AuthResult>>(
+    '/auth/oauth/exchange',
+    { code },
+  );
   return res.data.data;
 }

@@ -11,6 +11,7 @@ import * as bcrypt from 'bcryptjs';
 import { User } from './entities/user.entity';
 import { RegisterDto } from './dto/register.dto';
 import { LoginDto } from './dto/login.dto';
+import { AuthOauthCodeService } from './auth-oauth-code.service';
 
 export interface JwtPayload {
   sub: string;
@@ -33,6 +34,7 @@ export class AuthService {
     @InjectRepository(User)
     private readonly userRepository: Repository<User>,
     private readonly jwtService: JwtService,
+    private readonly oauthCodeService: AuthOauthCodeService,
   ) {}
 
   // ─── Register ────────────────────────────────────────────────────────────────
@@ -42,6 +44,13 @@ export class AuthService {
       where: { email: dto.email.toLowerCase() },
     });
     if (existing) {
+      if (existing.googleId && existing.provider === 'google') {
+        throw new ConflictException({
+          message:
+            'An account with this email already exists. Sign in with Google instead.',
+          code: 'GOOGLE_ACCOUNT_EXISTS',
+        });
+      }
       throw new ConflictException('An account with this email already exists.');
     }
 
@@ -60,14 +69,24 @@ export class AuthService {
   // ─── Login ───────────────────────────────────────────────────────────────────
 
   async login(dto: LoginDto): Promise<AuthResult> {
-    // Must explicitly select passwordHash since select: false
     const user = await this.userRepository
       .createQueryBuilder('user')
       .addSelect('user.passwordHash')
       .where('user.email = :email', { email: dto.email.toLowerCase() })
       .getOne();
 
-    if (!user || !user.passwordHash) {
+    if (!user) {
+      throw new UnauthorizedException('Invalid email or password.');
+    }
+
+    if (!user.passwordHash) {
+      if (user.googleId) {
+        throw new UnauthorizedException({
+          message:
+            'This account uses Google Sign-In. Please continue with Google.',
+          code: 'GOOGLE_AUTH_REQUIRED',
+        });
+      }
       throw new UnauthorizedException('Invalid email or password.');
     }
 
@@ -91,18 +110,14 @@ export class AuthService {
     });
 
     if (!user) {
-      // Check if they already registered with local email
       user = await this.userRepository.findOne({
         where: { email: profile.email.toLowerCase() },
       });
 
       if (user) {
-        // Link Google to existing account
         user.googleId = profile.googleId;
-        user.provider = 'google';
         await this.userRepository.save(user);
       } else {
-        // Brand-new user via Google
         user = this.userRepository.create({
           name: profile.name,
           email: profile.email.toLowerCase(),
@@ -114,6 +129,35 @@ export class AuthService {
       }
     }
 
+    return this.buildAuthResult(user);
+  }
+
+  // ─── OAuth one-time code exchange ────────────────────────────────────────────
+
+  async createOAuthRedirectCode(accessToken: string): Promise<string> {
+    return this.oauthCodeService.createCode(accessToken);
+  }
+
+  async exchangeOAuthCode(code: string): Promise<AuthResult> {
+    const accessToken = await this.oauthCodeService.exchangeCode(code);
+    if (!accessToken) {
+      throw new UnauthorizedException({
+        message: 'Invalid or expired authorization code.',
+        code: 'OAUTH_CODE_INVALID',
+      });
+    }
+
+    let payload: JwtPayload;
+    try {
+      payload = this.jwtService.verify(accessToken) as JwtPayload;
+    } catch {
+      throw new UnauthorizedException({
+        message: 'Invalid or expired authorization code.',
+        code: 'OAUTH_CODE_INVALID',
+      });
+    }
+
+    const user = await this.validateById(payload.sub);
     return this.buildAuthResult(user);
   }
 

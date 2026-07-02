@@ -21,16 +21,19 @@ export class AllExceptionsFilter implements ExceptionFilter {
     let status: number;
     let message: string | string[];
     let errorName: string;
+    let code: string | undefined;
 
     if (exception instanceof HttpException) {
       status = exception.getStatus();
       const exceptionResponse = exception.getResponse();
-      message =
-        typeof exceptionResponse === 'string'
-          ? exceptionResponse
-          : ((exceptionResponse as Record<string, unknown>).message as
-              | string
-              | string[]) ?? exception.message;
+      if (typeof exceptionResponse === 'string') {
+        message = exceptionResponse;
+      } else {
+        const responseBody = exceptionResponse as Record<string, unknown>;
+        message =
+          (responseBody.message as string | string[]) ?? exception.message;
+        code = responseBody.code as string | undefined;
+      }
       errorName = exception.name;
     } else {
 
@@ -51,6 +54,7 @@ export class AllExceptionsFilter implements ExceptionFilter {
     response.status(status).json({
       statusCode: status,
       message,
+      ...(code ? { code } : {}),
       error: errorName,
       path: request.url,
       timestamp: new Date().toISOString(),

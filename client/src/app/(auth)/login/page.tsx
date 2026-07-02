@@ -8,9 +8,10 @@ import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useLogin } from '@/hooks/useAuth';
 import { useAuthContext } from '@/providers/AuthProvider';
-import { setToken } from '@/lib/auth';
-
-// ─── Schema ───────────────────────────────────────────────────────────────────
+import { exchangeOAuthCode } from '@/lib/api/auth';
+import { getApiErrorCode, getApiErrorMessage } from '@/lib/api/auth-errors';
+import { GOOGLE_AUTH_URL } from '@/lib/auth-urls';
+import { AUTH_ERROR_CODES } from '@/types/auth';
 
 const loginSchema = z.object({
   email: z.string().email('Enter a valid email address'),
@@ -18,8 +19,6 @@ const loginSchema = z.object({
 });
 
 type LoginFormValues = z.infer<typeof loginSchema>;
-
-// ─── Google Icon ─────────────────────────────────────────────────────────────
 
 function GoogleIcon() {
   return (
@@ -32,31 +31,44 @@ function GoogleIcon() {
   );
 }
 
-// ─── Page ─────────────────────────────────────────────────────────────────────
-
 function LoginForm() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const { isAuthenticated, isLoading, login } = useAuthContext();
   const { mutate: loginMutate, isPending, error } = useLogin();
   const [showPassword, setShowPassword] = useState(false);
+  const [oauthError, setOauthError] = useState<string | null>(null);
+  const [isExchangingCode, setIsExchangingCode] = useState(false);
+  const [highlightGoogle, setHighlightGoogle] = useState(false);
 
-  // Handle Google OAuth callback token in query param
   useEffect(() => {
-    const token = searchParams.get('token');
-    if (token) {
-      // Fetch user info and log in
-      import('@/lib/axios').then(({ default: apiClient }) => {
-        apiClient.defaults.headers.common['Authorization'] = `Bearer ${token}`;
-        apiClient.get<{ data: { id: string; email: string; name: string; provider: string } }>('/auth/me').then((res) => {
-          login(token, res.data.data);
-          router.replace('/');
-        });
-      });
+    const errorParam = searchParams.get('error');
+    if (errorParam === 'google_auth_failed') {
+      setOauthError('Google sign-in was cancelled or failed. Please try again.');
+      window.history.replaceState(null, '', '/login');
+      return;
     }
+
+    const code = searchParams.get('code');
+    if (!code) {
+      return;
+    }
+
+    setIsExchangingCode(true);
+    exchangeOAuthCode(code)
+      .then((data) => {
+        login(data.accessToken, data.user);
+        router.replace('/');
+      })
+      .catch(() => {
+        setOauthError('Google sign-in failed. Please try again.');
+        window.history.replaceState(null, '', '/login');
+      })
+      .finally(() => {
+        setIsExchangingCode(false);
+      });
   }, [searchParams, login, router]);
 
-  // Redirect if already authenticated
   useEffect(() => {
     if (!isLoading && isAuthenticated) {
       router.replace('/');
@@ -72,21 +84,33 @@ function LoginForm() {
   });
 
   const onSubmit = (data: LoginFormValues) => {
-    loginMutate(data);
+    setHighlightGoogle(false);
+    loginMutate(data, {
+      onError: (submitError) => {
+        if (
+          getApiErrorCode(submitError) === AUTH_ERROR_CODES.GOOGLE_AUTH_REQUIRED
+        ) {
+          setHighlightGoogle(true);
+        }
+      },
+    });
   };
 
   const apiError =
-    error && (error as any).response?.data?.message
-      ? (error as any).response.data.message
-      : error
-      ? 'Login failed. Please try again.'
-      : null;
+    getApiErrorMessage(error) ??
+    (error ? 'Login failed. Please try again.' : null);
 
-  const GOOGLE_AUTH_URL = `${process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:3001'}/auth/google`;
+  if (isExchangingCode) {
+    return (
+      <div className="auth-card flex flex-col items-center justify-center py-12">
+        <span className="btn-spinner" />
+        <p className="auth-subtitle mt-4">Completing Google sign-in...</p>
+      </div>
+    );
+  }
 
   return (
     <div className="auth-card">
-      {/* Logo */}
       <div className="auth-logo">
         <span className="text-3xl">🎙️</span>
       </div>
@@ -94,20 +118,20 @@ function LoginForm() {
       <h1 className="auth-title">Welcome back</h1>
       <p className="auth-subtitle">Sign in to your AI Meeting Assistant account</p>
 
-      {/* Google OAuth */}
-      <a href={GOOGLE_AUTH_URL} className="btn-google" id="btn-google-login">
+      <a
+        href={GOOGLE_AUTH_URL}
+        className={`btn-google${highlightGoogle ? ' btn-google--highlight' : ''}`}
+        id="btn-google-login"
+      >
         <GoogleIcon />
         <span>Continue with Google</span>
       </a>
 
-      {/* Divider */}
       <div className="auth-divider">
         <span>or</span>
       </div>
 
-      {/* Form */}
       <form onSubmit={handleSubmit(onSubmit)} className="auth-form" id="login-form" noValidate>
-        {/* Email */}
         <div className="form-field">
           <label htmlFor="login-email" className="form-label">Email</label>
           <input
@@ -123,7 +147,6 @@ function LoginForm() {
           )}
         </div>
 
-        {/* Password */}
         <div className="form-field">
           <div className="form-label-row">
             <label htmlFor="login-password" className="form-label">Password</label>
@@ -154,12 +177,12 @@ function LoginForm() {
           )}
         </div>
 
-        {/* API Error */}
-        {apiError && (
-          <div className="alert-error" role="alert">{apiError}</div>
+        {(oauthError || apiError) && (
+          <div className="alert-error" role="alert">
+            {oauthError ?? apiError}
+          </div>
         )}
 
-        {/* Submit */}
         <button
           id="btn-login-submit"
           type="submit"
@@ -174,7 +197,6 @@ function LoginForm() {
         </button>
       </form>
 
-      {/* Footer link */}
       <p className="auth-footer">
         Don&apos;t have an account?{' '}
         <Link href="/register" className="auth-link">

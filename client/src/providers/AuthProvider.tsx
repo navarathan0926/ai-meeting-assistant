@@ -12,13 +12,7 @@ import { useRouter } from 'next/navigation';
 import { useQueryClient } from '@tanstack/react-query';
 import apiClient from '@/lib/axios';
 import { getToken, setToken, removeToken } from '@/lib/auth';
-
-interface AuthUser {
-  id: string;
-  email: string;
-  name: string;
-  provider: string;
-}
+import { AuthUser } from '@/types/auth';
 
 interface AuthContextValue {
   user: AuthUser | null;
