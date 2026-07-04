@@ -1,5 +1,6 @@
 import apiClient from '../axios';
-import { ApiResponse, Meeting } from '@/types/meeting';
+import { ApiResponse } from '@/types/api';
+import { Meeting } from '@/types/meeting';
 
 /**
  * meetingsApi

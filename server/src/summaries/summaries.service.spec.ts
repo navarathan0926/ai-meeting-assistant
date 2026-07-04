@@ -2,9 +2,9 @@ import { Test, TestingModule } from '@nestjs/testing';
 import { getRepositoryToken } from '@nestjs/typeorm';
 import { InternalServerErrorException } from '@nestjs/common';
 import { Repository } from 'typeorm';
-import { ConfigService } from '@nestjs/config';
 import { SummariesService } from './summaries.service';
 import { Summary } from './entities/summary.entity';
+import { provideOpenAiConfig } from '../common/config/config.testing';
 
 // ── Mock OpenAI ────────────────────────────────────────────────────────────────
 
@@ -71,16 +71,7 @@ describe('SummariesService', () => {
             }),
           },
         },
-        {
-          provide: ConfigService,
-          useValue: {
-            get: jest.fn().mockImplementation((key: string) => {
-              if (key === 'OPENAI_API_KEY') return 'test-api-key';
-              if (key === 'OPENAI_GPT_MODEL') return 'gpt-4o-mini';
-              return undefined;
-            }),
-          },
-        },
+        provideOpenAiConfig(),
       ],
     }).compile();
 

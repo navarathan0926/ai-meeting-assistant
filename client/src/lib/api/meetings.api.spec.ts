@@ -2,7 +2,8 @@ import axios from 'axios';
 import MockAdapter from 'axios-mock-adapter';
 import { meetingsApi } from './meetings.api';
 import apiClient from '../axios';
-import { Meeting, MeetingStatus, ApiResponse } from '@/types/meeting';
+import { ApiResponse } from '@/types/api';
+import { Meeting, MeetingStatus } from '@/types/meeting';
 
 // ── Setup ──────────────────────────────────────────────────────────────────────
 

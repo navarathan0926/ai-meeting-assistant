@@ -8,6 +8,7 @@ import { MeetingStatus } from '../meetings/enums/meeting-status.enum';
 import { TranscriptionsService } from '../transcriptions/transcriptions.service';
 import { SummariesService } from '../summaries/summaries.service';
 import { BlobStorageService } from '../storage/blob-storage.service';
+import { ItemExtractionService } from '../extracted-items/item-extraction.service';
 
 
 interface ExtractionJobData {
@@ -26,6 +27,7 @@ export class ExtractionProcessor extends WorkerHost {
     private readonly transcriptionsService: TranscriptionsService,
     private readonly summariesService: SummariesService,
     private readonly blobStorageService: BlobStorageService,
+    private readonly itemExtractionService: ItemExtractionService,
   ) {
     super();
   }
@@ -84,6 +86,8 @@ export class ExtractionProcessor extends WorkerHost {
 
       await this.updateStatus(meeting, MeetingStatus.COMPLETED);
       await job.updateProgress(100);
+
+      await this.itemExtractionService.addExtractItemsJob(meetingId);
 
       this.logger.log(
         `Meeting ${meetingId} fully processed — job [${job.id}] complete.`,

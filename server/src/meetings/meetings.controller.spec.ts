@@ -1,8 +1,12 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { MeetingsController } from './meetings.controller';
 import { MeetingsService } from './meetings.service';
+import { ExtractedItemsService } from '../extracted-items/extracted-items.service';
 import { MeetingStatus } from './enums/meeting-status.enum';
 import { MeetingResponse } from './interfaces/meeting-response.interface';
+import { ExtractedItemType } from '../extracted-items/enums/extracted-item-type.enum';
+import { ExtractedItemPriority } from '../extracted-items/enums/extracted-item-priority.enum';
+import { ExtractedItemStatus } from '../extracted-items/enums/extracted-item-status.enum';
 import { User } from '../auth/entities/user.entity';
 
 const TEST_USER: User = {
@@ -48,6 +52,7 @@ function buildMulterFile(overrides: Partial<Express.Multer.File> = {}): Express.
 describe('MeetingsController', () => {
   let controller: MeetingsController;
   let meetingsService: jest.Mocked<MeetingsService>;
+  let extractedItemsService: jest.Mocked<ExtractedItemsService>;
 
   beforeEach(async () => {
     const module: TestingModule = await Test.createTestingModule({
@@ -62,11 +67,18 @@ describe('MeetingsController', () => {
             deleteMeeting: jest.fn(),
           },
         },
+        {
+          provide: ExtractedItemsService,
+          useValue: {
+            findByMeeting: jest.fn(),
+          },
+        },
       ],
     }).compile();
 
     controller = module.get<MeetingsController>(MeetingsController);
     meetingsService = module.get(MeetingsService);
+    extractedItemsService = module.get(ExtractedItemsService);
   });
 
   afterEach(() => {
@@ -114,6 +126,36 @@ describe('MeetingsController', () => {
         'uuid-1234',
       );
       expect(result).toBe(meeting);
+    });
+  });
+
+  describe('listExtractedItems', () => {
+    it('should delegate to ExtractedItemsService.findByMeeting', async () => {
+      const items = [
+        {
+          id: 'item-1',
+          meetingId: 'uuid-1234',
+          type: ExtractedItemType.Task,
+          title: 'Fix bug',
+          description: 'Details',
+          priority: ExtractedItemPriority.High,
+          contextSnippet: 'Snippet',
+          status: ExtractedItemStatus.Draft,
+          jiraIssueKey: null,
+          jiraIssueUrl: null,
+          createdAt: new Date(),
+          updatedAt: new Date(),
+        },
+      ];
+      extractedItemsService.findByMeeting.mockResolvedValue(items);
+
+      const result = await controller.listExtractedItems(TEST_USER, 'uuid-1234');
+
+      expect(extractedItemsService.findByMeeting).toHaveBeenCalledWith(
+        TEST_USER.id,
+        'uuid-1234',
+      );
+      expect(result).toBe(items);
     });
   });
 

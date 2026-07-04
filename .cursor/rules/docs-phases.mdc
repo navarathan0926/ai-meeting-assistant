@@ -1,0 +1,133 @@
+---
+description: Standards for writing and editing phase planning documents in docs/phases/.
+globs:
+  - docs/phases/*.md
+---
+
+# Phase Document Standards
+
+## File Naming
+
+Phase files live in `docs/phases/` and follow this naming convention:
+
+```
+phase-<N>-<kebab-case-title>.md
+```
+
+Examples:
+- `phase-0-project-setup.md`
+- `phase-8-jira-draft-extraction.md`
+- `phase-17-integrate-task-manager.md`
+
+- Use **global** phase numbers (0-based, sequential across the whole roadmap),
+  not local sub-phase numbers.
+- Never use spaces in filenames. Replace spaces with hyphens.
+
+## Phase Numbering Reference
+
+Always use **global phase numbers** when referencing another phase inside a
+document. Never use "phase 1" to mean "the first Jira phase" — use the actual
+global number (e.g. "Phase 8").
+
+Current global phase map:
+
+| N | Theme |
+|---|-------|
+| 0 | Project setup |
+| 1 | MVP core flow |
+| 2 | Database integration |
+| 3 | Cloud storage |
+| 4 | Deployment & infrastructure |
+| 5 | Async processing (BullMQ) |
+| 6 | Testing & QA |
+| 7 | Security & performance |
+| 8 | Jira draft extraction |
+| 9 | Multi-project Jira |
+| 10 | Roles and approval permissions |
+| 11 | SUPERADMIN and organizations |
+| 12 | Meeting platform integration (Zoom) |
+| 13 | MCP and existing issue lookup |
+| 14 | Payment gateway |
+| 15 | Advanced features (real-time, analytics) |
+| 16 | Monitoring and maintenance |
+| 17 | Extended task manager integrations |
+| 18 | Future architecture and scale |
+
+## Document Structure
+
+For **implementation-ready phases** (8 and beyond), use this structure:
+
+```markdown
+# Phase N: Title
+
+## Goal
+One paragraph. What this phase achieves and why it matters.
+State explicitly what is NOT being built (scope boundary).
+
+## Before you start
+Numbered list of things to read or verify in the existing codebase
+before writing any code. Prevents building on wrong assumptions.
+
+## What to build
+
+### 1. <Component / feature name>
+- Bullet points describing what to build.
+- Reference exact file paths, entity names, column names, and
+  method signatures where known.
+- If a design decision has trade-offs, state them and pick one.
+
+### 2. <Next component>
+...
+
+## New module structure (if applicable)
+ASCII tree of new files/directories to create.
+
+## Technologies & Tools (if new dependencies are introduced)
+Table or list of new packages with brief justification.
+
+## Dependencies
+List of global phases that must be complete before this phase starts.
+
+## Explicitly out of scope for this phase
+Bullet list of things that were considered but deferred. This prevents
+scope creep during implementation.
+
+## Acceptance criteria
+Numbered list of testable conditions that define "done".
+Each criterion must be verifiable without reading the source code.
+```
+
+For **early setup phases** (0–7) or phases that are already complete,
+the existing structure (with `## Verification Checklist`) is acceptable.
+
+## Style Rules
+
+- Use **global phase numbers** in all cross-references (e.g. "Phase 11", not "phase 4").
+- Use backtick formatting for: entity names, column names, file paths, env vars,
+  method names, TypeScript types, and CLI commands.
+- Use snake_case for database column names, camelCase for TypeScript properties.
+- Keep "Explicitly out of scope" sections honest — list things that were
+  actually considered and deferred, not an exhaustive list of everything
+  not built.
+- Acceptance criteria must be **testable** — avoid vague criteria like
+  "the feature works correctly". Prefer "A USER cannot call the approve endpoint
+  and receives a 403 response."
+- Do not add emojis.
+
+## Architecture Docs
+
+Architecture documentation lives in `docs/architecture/` and is separate from
+phase docs. Phase docs describe **what to build and when**; architecture docs
+describe **how the system works now**.
+
+When a phase introduces a significant new pattern (new entity, new queue, new
+auth mechanism), update the relevant architecture doc alongside the phase doc.
+
+| Architecture doc | Update when |
+|-----------------|-------------|
+| `overview.md` | New feature module or infrastructure component added |
+| `data-flow.md` | New request flow or ingestion path |
+| `database-schema.md` | New entity or significant schema change |
+| `async-processing.md` | New queue or processor |
+| `security.md` | New auth mechanism, guard, or credential type |
+| `integrations.md` | New external service integrated |

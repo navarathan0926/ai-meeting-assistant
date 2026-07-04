@@ -5,9 +5,11 @@ import {
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
-import { ConfigService } from '@nestjs/config';
+import { Inject } from '@nestjs/common';
 import OpenAI from 'openai';
 import * as fs from 'fs';
+import { openAiConfiguration } from '../common/config/openai.config';
+import { ConfigType } from '@nestjs/config';
 import { Transcription } from './entities/transcription.entity';
 import { TranscribeDto } from './dto/transcribe.dto';
 import { TranscriptionResponse } from './interfaces/transcription-response.interface';
@@ -16,16 +18,18 @@ import { TranscriptionResponse } from './interfaces/transcription-response.inter
 export class TranscriptionsService {
   private readonly logger = new Logger(TranscriptionsService.name);
   private readonly openai: OpenAI;
+  private readonly whisperModel: string;
 
   constructor(
     @InjectRepository(Transcription)
     private readonly transcriptionRepository: Repository<Transcription>,
-    private readonly configService: ConfigService,
+    @Inject(openAiConfiguration.KEY)
+    openAiConfig: ConfigType<typeof openAiConfiguration>,
   ) {
-    const apiKey = this.configService.get<string>('OPENAI_API_KEY');
-    this.logger.debug(`OpenAI API Key present: ${!!apiKey}`);
+    this.logger.debug(`OpenAI API Key present: ${!!openAiConfig.apiKey}`);
+    this.whisperModel = openAiConfig.whisperModel;
     this.openai = new OpenAI({
-      apiKey: apiKey,
+      apiKey: openAiConfig.apiKey,
     });
   }
 
@@ -43,8 +47,7 @@ export class TranscriptionsService {
 
       const whisperResponse = await this.openai.audio.transcriptions.create({
         file: audioStream,
-        model:
-          this.configService.get<string>('OPENAI_WHISPER_MODEL') || 'whisper-1',
+        model: this.whisperModel,
         response_format: 'verbose_json',
       });
 

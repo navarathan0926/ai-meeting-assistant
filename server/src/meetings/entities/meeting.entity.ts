@@ -4,6 +4,7 @@ import {
   Entity,
   JoinColumn,
   ManyToOne,
+  OneToMany,
   OneToOne,
   PrimaryGeneratedColumn,
   UpdateDateColumn,
@@ -12,6 +13,7 @@ import { MeetingStatus } from '../enums/meeting-status.enum';
 import { Transcription } from '../../transcriptions/entities/transcription.entity';
 import { Summary } from '../../summaries/entities/summary.entity';
 import { User } from '../../auth/entities/user.entity';
+import { ExtractedItem } from '../../extracted-items/entities/extracted-item.entity';
 
 @Entity('meetings')
 export class Meeting {
@@ -58,6 +60,9 @@ export class Meeting {
     nullable: true,
   })
   summary: Summary;
+
+  @OneToMany(() => ExtractedItem, (item) => item.meeting)
+  extractedItems: ExtractedItem[];
 
   @CreateDateColumn()
   createdAt: Date;

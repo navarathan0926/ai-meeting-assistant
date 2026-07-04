@@ -156,6 +156,7 @@ function MeetingHistoryItem({ meeting, isActive, onClick, onDelete }: MeetingHis
         }
         confirmLabel="Delete"
         cancelLabel="Cancel"
+        confirmingLabel="Deleting..."
         isConfirming={isDeleting}
         onConfirm={() => deleteMeeting(meeting.id)}
         onCancel={() => setIsModalOpen(false)}

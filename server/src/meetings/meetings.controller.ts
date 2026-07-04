@@ -17,12 +17,17 @@ import { CurrentUser } from '../common/decorators/current-user.decorator';
 import { User } from '../auth/entities/user.entity';
 import { MeetingsService } from './meetings.service';
 import { MeetingResponse } from './interfaces/meeting-response.interface';
+import { ExtractedItemsService } from '../extracted-items/extracted-items.service';
+import { ExtractedItemResponse } from '../extracted-items/interfaces/extracted-item-response.interface';
 import type { Express } from 'express';
 
 @Auth()
 @Controller('meetings')
 export class MeetingsController {
-  constructor(private readonly meetingsService: MeetingsService) {}
+  constructor(
+    private readonly meetingsService: MeetingsService,
+    private readonly extractedItemsService: ExtractedItemsService,
+  ) {}
 
   @Post('upload')
   @HttpCode(HttpStatus.ACCEPTED)
@@ -45,6 +50,14 @@ export class MeetingsController {
     @Query('search') search?: string,
   ): Promise<MeetingResponse[]> {
     return this.meetingsService.findAll(user.id, search);
+  }
+
+  @Get(':id/extracted-items')
+  async listExtractedItems(
+    @CurrentUser() user: User,
+    @Param('id', ParseUUIDPipe) id: string,
+  ): Promise<ExtractedItemResponse[]> {
+    return this.extractedItemsService.findByMeeting(user.id, id);
   }
 
   @Get(':id')

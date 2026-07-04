@@ -4,9 +4,11 @@ import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { AudioUpload } from '@/components/upload/AudioUpload';
 import { MeetingResults } from '@/components/results/MeetingResults';
+import { ExtractedItemsReview } from '@/components/extracted-items/ExtractedItemsReview';
 import { MeetingHistory } from '@/components/history/MeetingHistory';
 import { useMeeting } from '@/hooks/useMeeting';
 import { useAuthContext } from '@/providers/AuthProvider';
+import { MeetingStatus } from '@/types/meeting';
 
 /**
  * Home page — the entry point of the AI Meeting Assistant.
@@ -98,6 +100,9 @@ export default function HomePage() {
                   Results
                 </h2>
                 <MeetingResults meeting={activeMeeting} />
+                {activeMeeting.status === MeetingStatus.Completed && (
+                  <ExtractedItemsReview meetingId={activeMeeting.id} />
+                )}
               </section>
             )}
           </div>

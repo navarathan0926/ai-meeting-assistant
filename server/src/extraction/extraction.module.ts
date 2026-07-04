@@ -10,6 +10,7 @@ import { ExtractionProcessor } from './extraction.processor';
 import { ExtractionController } from './extraction.controller';
 import { AuthModule } from '../auth/auth.module';
 import { MeetingsModule } from '../meetings/meetings.module';
+import { ExtractedItemsModule } from '../extracted-items/extracted-items.module';
 
 @Module({
   imports: [
@@ -26,6 +27,7 @@ import { MeetingsModule } from '../meetings/meetings.module';
     StorageModule,
     AuthModule,
     forwardRef(() => MeetingsModule),
+    forwardRef(() => ExtractedItemsModule),
   ],
   controllers: [ExtractionController],
   providers: [ExtractionService, ExtractionProcessor],

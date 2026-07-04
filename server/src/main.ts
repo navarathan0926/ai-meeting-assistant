@@ -1,8 +1,10 @@
 import { NestFactory } from '@nestjs/core';
 import { ValidationPipe } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 import { AppModule } from './app.module';
 import { AllExceptionsFilter } from './common/filters/http-exception.filter';
 import { TransformInterceptor } from './common/interceptors/transform.interceptor';
+import { AppConfig } from './common/config/app.config';
 
 import { WinstonModule, utilities as nestWinstonUtilities } from 'nest-winston';
 import * as winston from 'winston';
@@ -27,8 +29,11 @@ async function bootstrap() {
     }),
   });
 
+  const configService = app.get(ConfigService);
+  const appConfig = configService.get<AppConfig>('app')!;
+
   app.enableCors({
-    origin: process.env.CLIENT_URL ?? 'http://localhost:3000',
+    origin: appConfig.clientUrl,
     methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
     credentials: true,
   });
@@ -47,8 +52,7 @@ async function bootstrap() {
 
   app.useGlobalInterceptors(new TransformInterceptor());
 
-  const port = process.env.PORT ?? 4000;
-  await app.listen(port);
-  console.log(`🚀  Server running on http://localhost:${port}/api`);
+  await app.listen(appConfig.port);
+  console.log(`🚀  Server running on http://localhost:${appConfig.port}/api`);
 }
 bootstrap();

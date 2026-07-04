@@ -9,24 +9,35 @@ import { HealthController } from './health/health.controller';
 import { LoggerMiddleware } from './common/middleware/logger.middleware';
 import { ExtractionModule } from './extraction/extraction.module';
 import { AuthModule } from './auth/auth.module';
+import { ExtractedItemsModule } from './extracted-items/extracted-items.module';
+import {
+  configurations,
+  redisConfiguration,
+  validateEnvironment,
+} from './common/config';
+import { ConfigType } from '@nestjs/config';
 
 @Module({
   imports: [
     ConfigModule.forRoot({
       isGlobal: true,
       envFilePath: '.env',
+      load: configurations,
+      validate: validateEnvironment,
     }),
-    BullModule.forRoot({
-      connection: {
-        url: process.env.REDIS_URL || 'redis://localhost:6379',
-        ...(process.env.REDIS_URL?.startsWith('rediss://')
-          ? { tls: { rejectUnauthorized: false } }
-          : {}),
-      },
+    BullModule.forRootAsync({
+      inject: [redisConfiguration.KEY],
+      useFactory: (redis: ConfigType<typeof redisConfiguration>) => ({
+        connection: {
+          url: redis.url,
+          ...(redis.useTls ? { tls: { rejectUnauthorized: false } } : {}),
+        },
+      }),
     }),
     DatabaseModule,
     MeetingsModule,
     ExtractionModule,
+    ExtractedItemsModule,
     AuthModule,
   ],
   controllers: [AppController, HealthController],

@@ -2,11 +2,13 @@ import {
   Injectable,
   InternalServerErrorException,
   Logger,
+  Inject,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
-import { ConfigService } from '@nestjs/config';
 import OpenAI from 'openai';
+import { openAiConfiguration } from '../common/config/openai.config';
+import { ConfigType } from '@nestjs/config';
 import { Summary } from './entities/summary.entity';
 import { SummarizeDto } from './dto/summarize.dto';
 import { SummaryResponse } from './interfaces/summary-response.interface';
@@ -21,14 +23,17 @@ interface GptSummaryOutput {
 export class SummariesService {
   private readonly logger = new Logger(SummariesService.name);
   private readonly openai: OpenAI;
+  private readonly gptModel: string;
 
   constructor(
     @InjectRepository(Summary)
     private readonly summaryRepository: Repository<Summary>,
-    private readonly configService: ConfigService,
+    @Inject(openAiConfiguration.KEY)
+    openAiConfig: ConfigType<typeof openAiConfiguration>,
   ) {
+    this.gptModel = openAiConfig.gptModel;
     this.openai = new OpenAI({
-      apiKey: this.configService.get<string>('OPENAI_API_KEY'),
+      apiKey: openAiConfig.apiKey,
     });
   }
 
@@ -44,8 +49,7 @@ Respond ONLY with valid JSON. No markdown, no extra text.`;
 
     try {
       const completion = await this.openai.chat.completions.create({
-        model:
-          this.configService.get<string>('OPENAI_GPT_MODEL') || 'gpt-4o-mini',
+        model: this.gptModel,
         response_format: { type: 'json_object' },
         messages: [
           { role: 'system', content: systemPrompt },

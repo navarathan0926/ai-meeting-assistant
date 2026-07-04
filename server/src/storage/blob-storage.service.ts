@@ -1,5 +1,9 @@
-import { Injectable, InternalServerErrorException, Logger } from '@nestjs/common';
-import { ConfigService } from '@nestjs/config';
+import { Injectable, InternalServerErrorException, Inject, Logger } from '@nestjs/common';
+import { ConfigType } from '@nestjs/config';
+import {
+  azureStorageConfiguration,
+  isAzureStorageConfigured,
+} from '../common/config/azure.config';
 import {
   BlobSASPermissions,
   BlobServiceClient,
@@ -21,19 +25,13 @@ export class BlobStorageService {
 
   private readonly sharedKeyCredential: StorageSharedKeyCredential | null;
 
-  constructor(private readonly configService: ConfigService) {
-    this.containerName =
-      this.configService.get<string>('AZURE_STORAGE_CONTAINER_NAME') ||
-      this.configService.get<string>('AZURE_STORAGE_CONTAINER') ||
-      'uploads';
+  constructor(
+    @Inject(azureStorageConfiguration.KEY)
+    azureConfig: ConfigType<typeof azureStorageConfiguration>,
+  ) {
+    this.containerName = azureConfig.containerName;
 
-    const connectionString = this.configService.get<string>(
-      'AZURE_STORAGE_CONNECTION_STRING',
-    );
-    const accountName = this.configService.get<string>('AZURE_STORAGE_ACCOUNT_NAME');
-    const accountKey = this.configService.get<string>('AZURE_STORAGE_ACCOUNT_KEY');
-
-    if (!connectionString && (!accountName || !accountKey)) {
+    if (!isAzureStorageConfigured(azureConfig)) {
       throw new InternalServerErrorException(
         'Azure Blob Storage is not configured. Provide AZURE_STORAGE_CONNECTION_STRING or (AZURE_STORAGE_ACCOUNT_NAME + AZURE_STORAGE_ACCOUNT_KEY).',
       );
@@ -41,20 +39,26 @@ export class BlobStorageService {
 
     let blobServiceClient: BlobServiceClient;
 
-    if (connectionString) {
-      blobServiceClient = BlobServiceClient.fromConnectionString(connectionString);
+    if (azureConfig.connectionString) {
+      blobServiceClient = BlobServiceClient.fromConnectionString(
+        azureConfig.connectionString,
+      );
     } else {
-      const credential = new StorageSharedKeyCredential(accountName!, accountKey!);
+      const accountName = azureConfig.accountName!;
+      const accountKey = azureConfig.accountKey!;
+      const credential = new StorageSharedKeyCredential(accountName, accountKey);
       blobServiceClient = new BlobServiceClient(
         `https://${accountName}.blob.core.windows.net`,
         credential,
       );
     }
 
-    // We can only generate SAS if we have shared key credentials.
     this.sharedKeyCredential =
-      accountName && accountKey
-        ? new StorageSharedKeyCredential(accountName, accountKey)
+      azureConfig.accountName && azureConfig.accountKey
+        ? new StorageSharedKeyCredential(
+            azureConfig.accountName,
+            azureConfig.accountKey,
+          )
         : null;
 
     this.containerClient = blobServiceClient.getContainerClient(this.containerName);
