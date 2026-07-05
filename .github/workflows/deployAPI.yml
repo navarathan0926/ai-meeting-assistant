@@ -5,12 +5,12 @@ on:
     branches:
       - main
     paths:
-      - 'server/**' # Only run when files in the server folder change
+      - "server/**" # Only run when files in the server folder change
   workflow_dispatch:
 
 env:
   IMAGE_NAME: nestjs-api
-  CONTEXT: ./server  # Define the context path
+  CONTEXT: ./server # Define the context path
 
 jobs:
   test:
@@ -22,8 +22,8 @@ jobs:
       - name: Set up Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: '20'
-          cache: 'npm'
+          node-version: "20"
+          cache: "npm"
           cache-dependency-path: server/package-lock.json
 
       - name: Install dependencies
@@ -66,7 +66,7 @@ jobs:
         with:
           context: ./server
           push: true
-          tags: ${{ secrets.REGISTRY_LOGIN_SERVER }}/meeting-api:${{ github.sha }}
+          tags: ${{ secrets.REGISTRY_LOGIN_SERVER }}/${{ env.IMAGE_NAME }}:${{ github.sha }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
