@@ -38,6 +38,7 @@ const SAMPLE_MEETING: Meeting = {
   user: null as any,
   transcription: null,
   summary: null,
+  extractedItems: [],
   createdAt: new Date('2024-01-01'),
   updatedAt: new Date('2024-01-01'),
 };
