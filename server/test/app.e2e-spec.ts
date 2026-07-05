@@ -4,6 +4,7 @@ import request from 'supertest';
 import { getRepositoryToken } from '@nestjs/typeorm';
 import { getQueueToken } from '@nestjs/bullmq';
 import { ConfigModule } from '@nestjs/config';
+import { appConfiguration } from '../src/common/config/app.config';
 import { AppController } from '../src/app.controller';
 import { AppService } from '../src/app.service';
 import { HealthController } from '../src/health/health.controller';
@@ -47,7 +48,7 @@ const SAMPLE_MEETING: Meeting = {
 
 const mockMeetingsService = {
   createFromUpload: jest.fn(),
-  findAll: jest.fn().mockResolvedValue([]),
+  findAll: jest.fn().mockResolvedValue({ items: [], total: 0 }),
   findOne: jest.fn(),
   deleteMeeting: jest.fn().mockResolvedValue(undefined),
   assertOwned: jest.fn().mockResolvedValue(undefined),
@@ -62,7 +63,11 @@ const mockExtractionQueue = {
 async function createTestApp(): Promise<INestApplication> {
   const moduleFixture: TestingModule = await Test.createTestingModule({
     imports: [
-      ConfigModule.forRoot({ isGlobal: true, envFilePath: '.env' }),
+      ConfigModule.forRoot({
+        isGlobal: true,
+        envFilePath: '.env',
+        load: [appConfiguration],
+      }),
     ],
     controllers: [
       AppController,
@@ -122,13 +127,15 @@ describe('App (E2E Integration)', () => {
   });
 
   afterAll(async () => {
-    await app.close();
+    if (app) {
+      await app.close();
+    }
   });
 
   beforeEach(() => {
     jest.clearAllMocks();
     // Reset to default implementations
-    mockMeetingsService.findAll.mockResolvedValue([]);
+    mockMeetingsService.findAll.mockResolvedValue({ items: [], total: 0 });
     mockMeetingsService.deleteMeeting.mockResolvedValue(undefined);
   });
 
@@ -148,45 +155,56 @@ describe('App (E2E Integration)', () => {
   // ── GET /api/meetings ─────────────────────────────────────────────────────
 
   describe('GET /api/meetings', () => {
-    it('should return 200 with wrapped empty array', async () => {
+    it('should return 200 with wrapped empty paginated result', async () => {
       const res = await request(app.getHttpServer()).get('/api/meetings');
 
       expect(res.status).toBe(200);
       expect(res.body).toMatchObject({
-        data: [],
+        data: {
+          items: [],
+          total: 0,
+          page: 1,
+          limit: 20,
+          totalPages: 1,
+        },
         statusCode: 200,
       });
       expect(res.body.timestamp).toBeDefined();
     });
 
-    it('should return 200 with a list of meetings', async () => {
-      mockMeetingsService.findAll.mockResolvedValue([
-        {
-          id: VALID_UUID,
-          originalFileName: 'standup.mp3',
-          title: 'standup',
-          status: MeetingStatus.PENDING,
-          createdAt: new Date(),
-          updatedAt: new Date(),
-        },
-      ]);
+    it('should return 200 with a paginated list of meetings', async () => {
+      mockMeetingsService.findAll.mockResolvedValue({
+        items: [
+          {
+            id: VALID_UUID,
+            originalFileName: 'standup.mp3',
+            title: 'standup',
+            status: MeetingStatus.PENDING,
+            createdAt: new Date(),
+            updatedAt: new Date(),
+          },
+        ],
+        total: 1,
+      });
 
       const res = await request(app.getHttpServer()).get('/api/meetings');
 
       expect(res.status).toBe(200);
-      expect(res.body.data).toHaveLength(1);
-      expect(res.body.data[0].id).toBe(VALID_UUID);
+      expect(res.body.data.items).toHaveLength(1);
+      expect(res.body.data.items[0].id).toBe(VALID_UUID);
+      expect(res.body.data.total).toBe(1);
     });
 
-    it('should pass the search query to the service', async () => {
-      mockMeetingsService.findAll.mockResolvedValue([]);
+    it('should pass pagination and search query to the service', async () => {
+      mockMeetingsService.findAll.mockResolvedValue({ items: [], total: 0 });
 
       await request(app.getHttpServer()).get('/api/meetings?search=standup');
 
-      expect(mockMeetingsService.findAll).toHaveBeenCalledWith(
-        TEST_USER_ID,
-        'standup',
-      );
+      expect(mockMeetingsService.findAll).toHaveBeenCalledWith(TEST_USER_ID, {
+        page: 1,
+        limit: 20,
+        search: 'standup',
+      });
     });
   });
 
