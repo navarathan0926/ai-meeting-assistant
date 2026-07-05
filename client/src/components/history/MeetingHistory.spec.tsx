@@ -54,13 +54,25 @@ describe('MeetingHistory', () => {
   });
 
   it('renders empty state', () => {
-    mockUseMeetings.mockReturnValue({ data: [], isLoading: false });
+    mockUseMeetings.mockReturnValue({
+      data: { items: [], total: 0, page: 1, limit: 50, totalPages: 1 },
+      isLoading: false,
+    });
     render(<MeetingHistory onSelect={mockSelect} onDelete={mockDelete} />);
     expect(screen.getByText(/No meetings yet/i)).toBeInTheDocument();
   });
 
   it('renders meeting history items', () => {
-    mockUseMeetings.mockReturnValue({ data: mockMeetings, isLoading: false });
+    mockUseMeetings.mockReturnValue({
+      data: {
+        items: mockMeetings,
+        total: 2,
+        page: 1,
+        limit: 50,
+        totalPages: 1,
+      },
+      isLoading: false,
+    });
     render(<MeetingHistory onSelect={mockSelect} onDelete={mockDelete} />);
 
     expect(screen.getByText('meeting-one.mp3')).toBeInTheDocument();
@@ -70,7 +82,16 @@ describe('MeetingHistory', () => {
   });
 
   it('highlights active meeting', () => {
-    mockUseMeetings.mockReturnValue({ data: mockMeetings, isLoading: false });
+    mockUseMeetings.mockReturnValue({
+      data: {
+        items: mockMeetings,
+        total: 2,
+        page: 1,
+        limit: 50,
+        totalPages: 1,
+      },
+      isLoading: false,
+    });
     const { container } = render(
       <MeetingHistory activeMeetingId="1" onSelect={mockSelect} onDelete={mockDelete} />
     );
@@ -84,7 +105,16 @@ describe('MeetingHistory', () => {
   });
 
   it('triggers onSelect when meeting is clicked', () => {
-    mockUseMeetings.mockReturnValue({ data: mockMeetings, isLoading: false });
+    mockUseMeetings.mockReturnValue({
+      data: {
+        items: mockMeetings,
+        total: 2,
+        page: 1,
+        limit: 50,
+        totalPages: 1,
+      },
+      isLoading: false,
+    });
     render(<MeetingHistory onSelect={mockSelect} onDelete={mockDelete} />);
 
     fireEvent.click(screen.getByText('meeting-one.mp3'));
@@ -92,7 +122,16 @@ describe('MeetingHistory', () => {
   });
 
   it('opens confirmation modal and triggers delete on confirmation', async () => {
-    mockUseMeetings.mockReturnValue({ data: mockMeetings, isLoading: false });
+    mockUseMeetings.mockReturnValue({
+      data: {
+        items: mockMeetings,
+        total: 2,
+        page: 1,
+        limit: 50,
+        totalPages: 1,
+      },
+      isLoading: false,
+    });
     mockUseDeleteMeeting.mockImplementation((callback) => ({
       mutate: (id: string) => {
         mockDeleteMutate(id);

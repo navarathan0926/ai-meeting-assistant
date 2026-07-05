@@ -2,50 +2,41 @@ import {
   Injectable,
   InternalServerErrorException,
   Logger,
+  Inject,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
-import { ConfigService } from '@nestjs/config';
 import OpenAI from 'openai';
+import { openAiConfiguration } from '../common/config/openai.config';
+import { ConfigType } from '@nestjs/config';
 import { Summary } from './entities/summary.entity';
 import { SummarizeDto } from './dto/summarize.dto';
 import { SummaryResponse } from './interfaces/summary-response.interface';
 
-/** Shape expected from GPT structured output */
 interface GptSummaryOutput {
   overview: string;
   keyPoints: string[];
   actionItems: string[];
 }
 
-/**
- * SummariesService
- * Responsible for:
- *  1. Sending a transcript to OpenAI GPT for structured summarisation.
- *  2. Parsing the structured JSON response into distinct fields.
- *  3. Persisting the Summary entity.
- *  4. Mapping the entity to the client-facing SummaryResponse.
- */
 @Injectable()
 export class SummariesService {
   private readonly logger = new Logger(SummariesService.name);
   private readonly openai: OpenAI;
+  private readonly gptModel: string;
 
   constructor(
     @InjectRepository(Summary)
     private readonly summaryRepository: Repository<Summary>,
-    private readonly configService: ConfigService,
+    @Inject(openAiConfiguration.KEY)
+    openAiConfig: ConfigType<typeof openAiConfiguration>,
   ) {
+    this.gptModel = openAiConfig.gptModel;
     this.openai = new OpenAI({
-      apiKey: this.configService.get<string>('OPENAI_API_KEY'),
+      apiKey: openAiConfig.apiKey,
     });
   }
 
-  /**
-   * summariseTranscript
-   * Calls GPT-4o-mini with a structured prompt and persists the result.
-   * Uses JSON mode to guarantee a parseable response.
-   */
   async summariseTranscript(dto: SummarizeDto): Promise<Summary> {
     this.logger.log('Requesting GPT summary...');
 
@@ -58,7 +49,7 @@ Respond ONLY with valid JSON. No markdown, no extra text.`;
 
     try {
       const completion = await this.openai.chat.completions.create({
-        model: this.configService.get<string>('OPENAI_GPT_MODEL') || 'gpt-4o-mini',
+        model: this.gptModel,
         response_format: { type: 'json_object' },
         messages: [
           { role: 'system', content: systemPrompt },
@@ -67,7 +58,7 @@ Respond ONLY with valid JSON. No markdown, no extra text.`;
             content: `Here is the meeting transcript:\n\n${dto.transcript}`,
           },
         ],
-        temperature: 0.3, // lower = more deterministic, structured output
+        temperature: 0.3,
       });
 
       const raw = completion.choices[0]?.message?.content;
@@ -95,7 +86,6 @@ Respond ONLY with valid JSON. No markdown, no extra text.`;
     }
   }
 
-  /** Guard against malformed GPT JSON responses */
   private validateGptOutput(output: GptSummaryOutput): void {
     if (
       typeof output.overview !== 'string' ||
@@ -106,20 +96,6 @@ Respond ONLY with valid JSON. No markdown, no extra text.`;
     }
   }
 
-  /**
-   * deleteByMeetingId
-   * Removes the summary row whose FK points to the given meeting.
-   * Safe to call even if no summary exists yet.
-   */
-  async deleteByMeetingId(meetingId: string): Promise<void> {
-    await this.summaryRepository
-      .createQueryBuilder()
-      .delete()
-      .where('"meetingId" = :meetingId', { meetingId })
-      .execute();
-  }
-
-  /** Map a Summary entity to the client-facing interface */
   toResponse(summary: Summary): SummaryResponse {
     return {
       id: summary.id,

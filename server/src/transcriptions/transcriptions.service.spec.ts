@@ -1,11 +1,11 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { getRepositoryToken } from '@nestjs/typeorm';
-import { InternalServerErrorException } from '@nestjs/common';
 import { Repository } from 'typeorm';
-import { ConfigService } from '@nestjs/config';
+import { InternalServerErrorException } from '@nestjs/common';
 import * as fs from 'fs';
 import { TranscriptionsService } from './transcriptions.service';
 import { Transcription } from './entities/transcription.entity';
+import { provideOpenAiConfig } from '../common/config/config.testing';
 
 // ── Mocks ──────────────────────────────────────────────────────────────────────
 
@@ -78,16 +78,7 @@ describe('TranscriptionsService', () => {
             }),
           },
         },
-        {
-          provide: ConfigService,
-          useValue: {
-            get: jest.fn().mockImplementation((key: string) => {
-              if (key === 'OPENAI_API_KEY') return 'test-api-key';
-              if (key === 'OPENAI_WHISPER_MODEL') return 'whisper-1';
-              return undefined;
-            }),
-          },
-        },
+        provideOpenAiConfig(),
       ],
     }).compile();
 
@@ -179,30 +170,6 @@ describe('TranscriptionsService', () => {
         expect.objectContaining({ durationSeconds: null }),
       );
       expect(result).toBe(savedTranscription);
-    });
-  });
-
-  // ── deleteByMeetingId ─────────────────────────────────────────────────────
-
-  describe('deleteByMeetingId', () => {
-    it('should execute a DELETE query targeting the given meetingId', async () => {
-      const qb = transcriptionRepo.createQueryBuilder() as any;
-
-      await service.deleteByMeetingId('meeting-uuid-1');
-
-      expect(qb.delete).toHaveBeenCalled();
-      expect(qb.where).toHaveBeenCalledWith(
-        '"meetingId" = :meetingId',
-        { meetingId: 'meeting-uuid-1' },
-      );
-      expect(qb.execute).toHaveBeenCalled();
-    });
-
-    it('should not throw even when no matching transcription exists', async () => {
-      const qb = transcriptionRepo.createQueryBuilder() as any;
-      qb.execute.mockResolvedValue({ affected: 0 });
-
-      await expect(service.deleteByMeetingId('ghost-uuid')).resolves.toBeUndefined();
     });
   });
 

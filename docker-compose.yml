@@ -23,6 +23,8 @@ services:
       DB_HOST: host.docker.internal
       REDIS_URL: redis://redis:6379
       CLIENT_URL: http://localhost:3000
+      FRONTEND_URL: http://localhost:3000
+      GOOGLE_CALLBACK_URL: http://localhost:4000/api/auth/google/callback
     extra_hosts:
       - 'host.docker.internal:host-gateway'
     depends_on:

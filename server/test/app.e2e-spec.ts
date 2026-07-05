@@ -25,6 +25,7 @@ import { AuthGuard } from '../src/common/guards/auth.guard';
 
 const VALID_UUID = 'a1b2c3d4-e5f6-7890-abcd-ef1234567890';
 const INVALID_UUID = 'not-a-valid-uuid';
+const TEST_USER_ID = 'b2c3d4e5-f6a7-8901-bcde-f12345678901';
 
 const SAMPLE_MEETING: Meeting = {
   id: VALID_UUID,
@@ -33,6 +34,8 @@ const SAMPLE_MEETING: Meeting = {
   storedFileName: 'stored-uuid.mp3',
   status: MeetingStatus.PENDING,
   errorMessage: null,
+  userId: TEST_USER_ID,
+  user: null as any,
   transcription: null,
   summary: null,
   createdAt: new Date('2024-01-01'),
@@ -46,6 +49,7 @@ const mockMeetingsService = {
   findAll: jest.fn().mockResolvedValue([]),
   findOne: jest.fn(),
   deleteMeeting: jest.fn().mockResolvedValue(undefined),
+  assertOwned: jest.fn().mockResolvedValue(undefined),
 };
 
 const mockExtractionQueue = {
@@ -82,7 +86,17 @@ async function createTestApp(): Promise<INestApplication> {
     ],
   })
     .overrideGuard(AuthGuard)
-    .useValue({ canActivate: () => true })
+    .useValue({
+      canActivate: (context) => {
+        const req = context.switchToHttp().getRequest();
+        req.user = {
+          id: TEST_USER_ID,
+          email: 'test@example.com',
+          name: 'Test User',
+        };
+        return true;
+      },
+    })
     .compile();
 
   const app = moduleFixture.createNestApplication();
@@ -168,7 +182,10 @@ describe('App (E2E Integration)', () => {
 
       await request(app.getHttpServer()).get('/api/meetings?search=standup');
 
-      expect(mockMeetingsService.findAll).toHaveBeenCalledWith('standup');
+      expect(mockMeetingsService.findAll).toHaveBeenCalledWith(
+        TEST_USER_ID,
+        'standup',
+      );
     });
   });
 
@@ -314,11 +331,16 @@ describe('App (E2E Integration)', () => {
         attemptsMade: 1,
       };
       mockExtractionQueue.getJob.mockResolvedValue(mockJob);
+      mockMeetingsService.assertOwned.mockResolvedValue(undefined);
 
       const res = await request(app.getHttpServer()).get(
         '/api/extraction/job-123/status',
       );
 
+      expect(mockMeetingsService.assertOwned).toHaveBeenCalledWith(
+        TEST_USER_ID,
+        VALID_UUID,
+      );
       expect(res.status).toBe(200);
       expect(res.body.data.jobId).toBe('job-123');
       expect(res.body.data.state).toBe('completed');

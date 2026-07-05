@@ -1,97 +1,82 @@
+'use client';
+
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { meetingsApi } from '@/lib/api/meetings.api';
 import { Meeting, MeetingStatus } from '@/types/meeting';
 import { useToast } from '@/providers/ToastProvider';
-
-
-// ── Query keys ────────────────────────────────────────────────────────────────
-// Centralised so cache invalidation is never a string guess.
+import { useAuthContext } from '@/providers/AuthProvider';
 
 export const meetingKeys = {
-  all: ['meetings'] as const,
-  detail: (id: string) => ['meetings', id] as const,
+  all: (userId: string, search?: string) =>
+    ['meetings', userId, search ?? ''] as const,
+  detail: (userId: string, id: string) => ['meetings', userId, id] as const,
 };
 
-// ── useUploadMeeting ──────────────────────────────────────────────────────────
-
-/**
- * Uploads an audio file and returns the initial (PENDING) meeting record.
- * On success, invalidates the meetings list cache automatically.
- */
 export function useUploadMeeting() {
   const queryClient = useQueryClient();
+  const { user } = useAuthContext();
 
   return useMutation<Meeting, Error, File>({
     mutationFn: (file: File) => meetingsApi.upload(file),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: meetingKeys.all });
+      if (user?.id) {
+        queryClient.invalidateQueries({ queryKey: ['meetings', user.id] });
+      }
     },
   });
 }
 
-// ── useMeeting ────────────────────────────────────────────────────────────────
-
-/**
- * Fetches a single meeting by ID.
- * Automatically polls every 3 seconds while the meeting is still processing.
- * Stops polling once status is 'completed' or 'failed'.
- */
 export function useMeeting(id: string | null) {
+  const { user } = useAuthContext();
+  const userId = user?.id ?? '';
+
   return useQuery<Meeting, Error>({
-    queryKey: meetingKeys.detail(id ?? ''),
+    queryKey: meetingKeys.detail(userId, id ?? ''),
     queryFn: () => meetingsApi.getById(id!),
-    enabled: !!id,
+    enabled: !!id && !!userId,
     refetchInterval: (query) => {
       const status = query.state.data?.status;
       const isTerminal =
         status === MeetingStatus.Completed || status === MeetingStatus.Failed;
-      return isTerminal ? false : 3000; // poll every 3s until done
+      return isTerminal ? false : 3000;
     },
   });
 }
 
-// ── useMeetings ───────────────────────────────────────────────────────────────
+export function useMeetings(search?: string) {
+  const { user } = useAuthContext();
+  const userId = user?.id ?? '';
 
-/**
- * Fetches the full list of past meetings.
- * Used by the history panel.
- */
-export function useMeetings() {
-  return useQuery<Meeting[], Error>({
-    queryKey: meetingKeys.all,
-    queryFn: meetingsApi.getAll,
+  return useQuery({
+    queryKey: meetingKeys.all(userId, search),
+    queryFn: () =>
+      meetingsApi.getAll({ page: 1, limit: 50, search: search?.trim() || undefined }),
+    enabled: !!userId,
     refetchInterval: (query) => {
-      const meetings = query.state.data;
+      const meetings = query.state.data?.items;
       if (!meetings) return false;
       const hasPending = meetings.some(
         (m) =>
           m.status === MeetingStatus.Pending ||
-          m.status === MeetingStatus.Processing
+          m.status === MeetingStatus.Processing,
       );
       return hasPending ? 3000 : false;
     },
   });
 }
 
-// ── useDeleteMeeting ──────────────────────────────────────────────────────────
-
-/**
- * Deletes a meeting by ID.
- * On success:
- *  - removes the detail cache entry so stale data is never shown
- *  - invalidates the list cache so the history sidebar refreshes
- * Accepts an optional onSuccess callback so the parent can clear the
- * active selection when the currently-viewed meeting is deleted.
- */
 export function useDeleteMeeting(onSuccess?: (id: string) => void) {
   const queryClient = useQueryClient();
   const { showToast } = useToast();
+  const { user } = useAuthContext();
 
   return useMutation<void, Error, string>({
     mutationFn: (id: string) => meetingsApi.delete(id),
     onSuccess: (_, id) => {
-      queryClient.removeQueries({ queryKey: meetingKeys.detail(id) });
-      queryClient.invalidateQueries({ queryKey: meetingKeys.all });
+      if (user?.id) {
+        queryClient.removeQueries({ queryKey: meetingKeys.detail(user.id, id) });
+        queryClient.invalidateQueries({ queryKey: ['meetings', user.id] });
+      }
       showToast('Meeting deleted successfully!', 'success');
       onSuccess?.(id);
     },

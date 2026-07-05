@@ -1,35 +1,46 @@
 # AI Meeting Assistant
 
-An AI-powered meeting assistant that transcribes audio recordings and generates smart summaries using OpenAI APIs.
+An AI-powered meeting assistant that transcribes audio recordings, generates
+smart summaries using OpenAI APIs, extracts actionable items, and pushes them
+to external task managers (Jira, Linear, GitHub Issues).
 
 ## Tech Stack
 
-| Layer    | Technology                           |
-| -------- | ------------------------------------ |
-| Frontend | Next.js 16, TailwindCSS, React Query |
-| Backend  | NestJS 10, TypeORM                   |
-| Database | PostgreSQL                           |
-| AI       | OpenAI Whisper + GPT APIs            |
+| Layer      | Technology                                    |
+| ---------- | --------------------------------------------- |
+| Frontend   | Next.js, TailwindCSS, React Query             |
+| Backend    | NestJS, TypeORM                               |
+| Database   | PostgreSQL                                    |
+| Queue      | BullMQ + Redis (Upstash)                      |
+| Storage    | Azure Blob Storage                            |
+| AI         | OpenAI Whisper + GPT APIs                     |
+| Auth       | JWT + Google OAuth                            |
 
 ## Project Structure
 
 ```
-sample-meeting-assistent/
+ai-meeting-assistant/
 ├── client/               # Next.js frontend
 │   └── src/
 │       ├── app/          # App Router pages & layouts
 │       ├── components/   # Shared UI components
 │       ├── hooks/        # Custom React Query hooks
-│       ├── lib/          # Axios instance & utilities
+│       ├── lib/          # Axios instance & API clients
 │       ├── providers/    # Context / QueryProvider
 │       └── types/        # Shared TypeScript interfaces
-└── server/               # NestJS backend
-    └── src/
-        ├── common/       # Guards, filters, interceptors
-        ├── database/     # TypeORM DatabaseModule
-        ├── meetings/     # Meetings feature module (Phase 1)
-        ├── summaries/    # Summarization module (Phase 1)
-        └── transcriptions/ # Transcription module (Phase 1)
+├── server/               # NestJS backend
+│   └── src/
+│       ├── common/       # Guards, filters, interceptors
+│       ├── database/     # TypeORM config & migrations
+│       ├── auth/         # JWT + Google OAuth
+│       ├── meetings/     # Meeting CRUD + upload
+│       ├── transcriptions/ # Whisper transcription
+│       ├── summaries/    # GPT summarization
+│       ├── extraction/   # BullMQ job queue & processor
+│       └── storage/      # Azure Blob Storage
+└── docs/
+    ├── phases/           # Phase-by-phase implementation docs
+    └── architecture/     # System architecture reference docs
 ```
 
 ## Getting Started
@@ -59,15 +70,30 @@ npm run dev                   # Starts on http://localhost:3000
 
 ## Development Phases
 
-| Phase | Description                        | Status  |
-| ----- | ---------------------------------- | ------- |
-| 0     | Project Setup                      | ✅ Done |
-| 1     | MVP Core Flow (upload, transcribe) | ✅ Done |
-| 2     | Database Integration               | ✅ Done |
-| 3     | Cloud Storage (Azure Blob)         | ✅ Done |
-| 4     | Deployment & Infrastructure (Docker)| 🚀 Active |
-| 5     | Async Processing (BullMQ + Redis)  | 🔜 Next |
-| 6     | Testing & QA                       | 🔜 Next |
+| Phase | Description                                   | Status      |
+| ----- | --------------------------------------------- | ----------- |
+| 0     | Project Setup                                 | ✅ Done     |
+| 1     | MVP Core Flow (upload, transcribe, summarize) | ✅ Done     |
+| 2     | Database Integration (PostgreSQL + TypeORM)   | ✅ Done     |
+| 3     | Cloud Storage (Azure Blob)                    | ✅ Done     |
+| 4     | Deployment & Infrastructure (Docker, CI/CD)   | ✅ Done     |
+| 5     | Async Processing (BullMQ + Redis)             | ✅ Done     |
+| 6     | Testing & QA (Jest + Playwright)              | ✅ Done     |
+| 7     | Security & Performance                        | 🔜 Planned  |
+| 8     | Jira Draft Extraction & Approval              | 🔜 Planned  |
+| 9     | Multi-Project Jira & AI Project Selection     | 🔜 Planned  |
+| 10    | Roles (USER / ADMIN) & Approval Permissions   | 🔜 Planned  |
+| 11    | SUPERADMIN & Multi-Organization Support       | 🔜 Planned  |
+| 12    | Meeting Platform Integration (Zoom)           | 🔜 Planned  |
+| 13    | MCP & Existing Issue Lookup                   | 🔜 Planned  |
+| 14    | Payment Gateway & Subscriptions               | 🔜 Planned  |
+| 15    | Real-Time Transcription & Analytics           | 🔜 Planned  |
+| 16    | Monitoring, Observability & Maintenance       | 🔜 Planned  |
+| 17    | Extended Task Manager Integrations            | 🔜 Planned  |
+| 18    | Future Architecture & Scale                   | 🔜 Planned  |
+
+See [`docs/phases/`](./docs/phases/) for detailed specs per phase and
+[`docs/architecture/`](./docs/architecture/) for system architecture reference.
 
 ## Docker Deployment (ASAP Production Method)
 

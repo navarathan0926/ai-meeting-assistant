@@ -1,16 +1,22 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { getRepositoryToken } from '@nestjs/typeorm';
-import { ConflictException, UnauthorizedException, NotFoundException } from '@nestjs/common';
+import {
+  ConflictException,
+  UnauthorizedException,
+  NotFoundException,
+} from '@nestjs/common';
 import { Repository } from 'typeorm';
 import { JwtService } from '@nestjs/jwt';
 import * as bcrypt from 'bcryptjs';
 import { AuthService } from './auth.service';
+import { AuthOauthCodeService } from './auth-oauth-code.service';
 import { User } from './entities/user.entity';
 
 describe('AuthService', () => {
   let service: AuthService;
   let userRepo: jest.Mocked<Repository<User>>;
   let jwtService: jest.Mocked<JwtService>;
+  let oauthCodeService: jest.Mocked<AuthOauthCodeService>;
 
   beforeEach(async () => {
     const mockQueryBuilder = {
@@ -35,6 +41,14 @@ describe('AuthService', () => {
           provide: JwtService,
           useValue: {
             sign: jest.fn().mockReturnValue('mock-jwt-token'),
+            verify: jest.fn(),
+          },
+        },
+        {
+          provide: AuthOauthCodeService,
+          useValue: {
+            createCode: jest.fn().mockResolvedValue('oauth-code-123'),
+            exchangeCode: jest.fn(),
           },
         },
       ],
@@ -43,6 +57,7 @@ describe('AuthService', () => {
     service = module.get<AuthService>(AuthService);
     userRepo = module.get(getRepositoryToken(User));
     jwtService = module.get(JwtService);
+    oauthCodeService = module.get(AuthOauthCodeService);
   });
 
   describe('register', () => {
@@ -56,6 +71,27 @@ describe('AuthService', () => {
           password: 'password123',
         }),
       ).rejects.toThrow(ConflictException);
+    });
+
+    it('should throw GOOGLE_ACCOUNT_EXISTS when email belongs to Google-only user', async () => {
+      userRepo.findOne.mockResolvedValue({
+        id: 'user-uuid',
+        email: 'test@example.com',
+        googleId: 'google-123',
+        provider: 'google',
+      } as User);
+
+      await expect(
+        service.register({
+          name: 'Test',
+          email: 'test@example.com',
+          password: 'password123',
+        }),
+      ).rejects.toMatchObject({
+        response: {
+          code: 'GOOGLE_ACCOUNT_EXISTS',
+        },
+      });
     });
 
     it('should create and save a new user, and return JWT + user info', async () => {
@@ -111,6 +147,31 @@ describe('AuthService', () => {
           password: 'password123',
         }),
       ).rejects.toThrow(UnauthorizedException);
+    });
+
+    it('should throw GOOGLE_AUTH_REQUIRED for Google-only accounts', async () => {
+      const mockUser = {
+        id: 'user-uuid',
+        email: 'test@example.com',
+        name: 'Test User',
+        passwordHash: null,
+        googleId: 'google-123',
+        provider: 'google',
+      } as User;
+
+      const mockQb = userRepo.createQueryBuilder();
+      (mockQb.getOne as jest.Mock).mockResolvedValue(mockUser);
+
+      await expect(
+        service.login({
+          email: 'test@example.com',
+          password: 'password123',
+        }),
+      ).rejects.toMatchObject({
+        response: {
+          code: 'GOOGLE_AUTH_REQUIRED',
+        },
+      });
     });
 
     it('should throw UnauthorizedException if password does not match', async () => {
@@ -188,7 +249,7 @@ describe('AuthService', () => {
       expect(result.user.id).toBe('user-uuid');
     });
 
-    it('should link Google to existing account if email matches but googleId is missing', async () => {
+    it('should link Google to existing local account without changing provider', async () => {
       const mockUser = {
         id: 'user-uuid',
         email: 'test@example.com',
@@ -197,8 +258,8 @@ describe('AuthService', () => {
       } as User;
 
       userRepo.findOne
-        .mockResolvedValueOnce(null) // googleId not found
-        .mockResolvedValueOnce(mockUser); // email found
+        .mockResolvedValueOnce(null)
+        .mockResolvedValueOnce(mockUser);
 
       const result = await service.googleLogin({
         googleId: 'google-123',
@@ -207,15 +268,15 @@ describe('AuthService', () => {
       });
 
       expect(mockUser.googleId).toBe('google-123');
-      expect(mockUser.provider).toBe('google');
+      expect(mockUser.provider).toBe('local');
       expect(userRepo.save).toHaveBeenCalledWith(mockUser);
       expect(result.user.id).toBe('user-uuid');
     });
 
     it('should create new user if googleId and email do not exist', async () => {
       userRepo.findOne
-        .mockResolvedValueOnce(null) // googleId not found
-        .mockResolvedValueOnce(null); // email not found
+        .mockResolvedValueOnce(null)
+        .mockResolvedValueOnce(null);
 
       const mockUser = {
         id: 'new-uuid',
@@ -245,11 +306,61 @@ describe('AuthService', () => {
     });
   });
 
+  describe('createOAuthRedirectCode', () => {
+    it('should delegate to oauth code service', async () => {
+      const code = await service.createOAuthRedirectCode('jwt-token');
+
+      expect(oauthCodeService.createCode).toHaveBeenCalledWith('jwt-token');
+      expect(code).toBe('oauth-code-123');
+    });
+  });
+
+  describe('exchangeOAuthCode', () => {
+    it('should throw when code is invalid or expired', async () => {
+      oauthCodeService.exchangeCode.mockResolvedValue(null);
+
+      await expect(service.exchangeOAuthCode('bad-code')).rejects.toMatchObject({
+        response: {
+          code: 'OAUTH_CODE_INVALID',
+        },
+      });
+    });
+
+    it('should return auth result for valid code', async () => {
+      oauthCodeService.exchangeCode.mockResolvedValue('stored-jwt');
+      jwtService.verify.mockReturnValue({
+        sub: 'user-uuid',
+        email: 'test@example.com',
+      });
+      userRepo.findOne.mockResolvedValue({
+        id: 'user-uuid',
+        email: 'test@example.com',
+        name: 'Test User',
+        provider: 'google',
+      } as User);
+      jwtService.sign.mockReturnValue('fresh-jwt-token');
+
+      const result = await service.exchangeOAuthCode('valid-code');
+
+      expect(result).toEqual({
+        accessToken: 'fresh-jwt-token',
+        user: {
+          id: 'user-uuid',
+          email: 'test@example.com',
+          name: 'Test User',
+          provider: 'google',
+        },
+      });
+    });
+  });
+
   describe('validateById', () => {
     it('should throw NotFoundException if user not found', async () => {
       userRepo.findOne.mockResolvedValue(null);
 
-      await expect(service.validateById('non-existent')).rejects.toThrow(NotFoundException);
+      await expect(service.validateById('non-existent')).rejects.toThrow(
+        NotFoundException,
+      );
     });
 
     it('should return user if found', async () => {

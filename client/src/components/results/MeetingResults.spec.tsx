@@ -114,16 +114,8 @@ describe('MeetingResults', () => {
       expect(screen.getByText('This is the full transcript text.')).toBeInTheDocument();
     });
 
-    it('should render an audio player when audioUrl is provided', () => {
+    it('does not render an audio player (audio is shown in the dashboard sticky bar)', () => {
       const meeting = buildMeeting({ audioUrl: 'https://example.com/audio.mp3' });
-      render(<MeetingResults meeting={meeting} />);
-      const audio = document.querySelector('audio');
-      expect(audio).toBeInTheDocument();
-      expect(audio?.src).toContain('audio.mp3');
-    });
-
-    it('should NOT render audio player when audioUrl is absent', () => {
-      const meeting = buildMeeting({ audioUrl: undefined });
       render(<MeetingResults meeting={meeting} />);
       expect(document.querySelector('audio')).not.toBeInTheDocument();
     });

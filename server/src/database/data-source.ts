@@ -17,6 +17,8 @@ import { Meeting } from '../meetings/entities/meeting.entity';
 import { Transcription } from '../transcriptions/entities/transcription.entity';
 import { Summary } from '../summaries/entities/summary.entity';
 import { User } from '../auth/entities/user.entity';
+import { ExtractedItem } from '../extracted-items/entities/extracted-item.entity';
+import { buildDatabaseConfig } from '../common/config/database.config';
 
 // Ensure .env is loaded when this file is imported by the CLI
 dotenv.config();
@@ -28,22 +30,19 @@ dotenv.config();
  *  - DatabaseModule (NestJS module — .env already loaded by dotenv above)
  */
 export function buildDataSourceOptions(): DataSourceOptions {
+  const db = buildDatabaseConfig();
+
   return {
     type: 'postgres',
-    host: process.env.DB_HOST || 'localhost',
-    port: parseInt(process.env.DB_PORT ?? '5432', 10),
-    username: process.env.DB_PASSWORD ? process.env.DB_USERNAME || 'postgres' : process.env.DB_USERNAME,
-    password: process.env.DB_PASSWORD || '',
-    database: process.env.DB_NAME || 'ai_meeting_assistant',
-    entities: [Meeting, Transcription, Summary, User],
+    host: db.host,
+    port: db.port,
+    username: db.username,
+    password: db.password,
+    database: db.database,
+    entities: [Meeting, Transcription, Summary, User, ExtractedItem],
     synchronize: false,
     logging: false,
-    ssl:
-      process.env.DB_HOST !== 'localhost' &&
-      process.env.DB_HOST !== 'host.docker.internal' &&
-      process.env.DB_HOST !== 'postgres'
-        ? { rejectUnauthorized: false }
-        : false,
+    ssl: db.ssl ? { rejectUnauthorized: false } : false,
   };
 }
 

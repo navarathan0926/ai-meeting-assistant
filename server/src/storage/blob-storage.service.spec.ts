@@ -1,6 +1,5 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { InternalServerErrorException } from '@nestjs/common';
-import { ConfigService } from '@nestjs/config';
 
 // ── Mock @azure/storage-blob before importing the service ──────────────────────
 
@@ -26,31 +25,19 @@ jest.mock('@azure/storage-blob', () => ({
 }));
 
 import { BlobStorageService } from './blob-storage.service';
+import {
+  AzureStorageConfig,
+  provideAzureStorageConfig,
+} from '../common/config/config.testing';
 
 // ── Tests ──────────────────────────────────────────────────────────────────────
 
 describe('BlobStorageService', () => {
   let service: BlobStorageService;
 
-  function createModule(envOverrides: Record<string, string> = {}) {
-    const defaultEnv: Record<string, string> = {
-      AZURE_STORAGE_CONNECTION_STRING: 'DefaultEndpointsProtocol=https;AccountName=test;AccountKey=key;EndpointSuffix=core.windows.net',
-      AZURE_STORAGE_CONTAINER_NAME: 'test-container',
-    };
-
+  function createModule(overrides: Partial<AzureStorageConfig> = {}) {
     return Test.createTestingModule({
-      providers: [
-        BlobStorageService,
-        {
-          provide: ConfigService,
-          useValue: {
-            get: jest.fn().mockImplementation((key: string) => {
-              const env = { ...defaultEnv, ...envOverrides };
-              return env[key] ?? undefined;
-            }),
-          },
-        },
-      ],
+      providers: [BlobStorageService, provideAzureStorageConfig(overrides)],
     }).compile();
   }
 
@@ -60,29 +47,26 @@ describe('BlobStorageService', () => {
     service = module.get<BlobStorageService>(BlobStorageService);
   });
 
-  // ── Constructor ───────────────────────────────────────────────────────────
-
   describe('constructor', () => {
     it('should throw InternalServerErrorException when no credentials are configured', async () => {
       await expect(
         createModule({
-          AZURE_STORAGE_CONNECTION_STRING: undefined,
-          AZURE_STORAGE_ACCOUNT_NAME: undefined,
-          AZURE_STORAGE_ACCOUNT_KEY: undefined,
+          connectionString: null,
+          accountName: null,
+          accountKey: null,
         }),
       ).rejects.toThrow(InternalServerErrorException);
     });
 
     it('should initialize successfully with a connection string', async () => {
       const module = await createModule({
-        AZURE_STORAGE_CONNECTION_STRING: 'DefaultEndpointsProtocol=https;AccountName=test;AccountKey=dGVzdA==;EndpointSuffix=core.windows.net',
+        connectionString:
+          'DefaultEndpointsProtocol=https;AccountName=test;AccountKey=dGVzdA==;EndpointSuffix=core.windows.net',
       });
       const svc = module.get<BlobStorageService>(BlobStorageService);
       expect(svc).toBeDefined();
     });
   });
-
-  // ── getContainerName ──────────────────────────────────────────────────────
 
   describe('getContainerName', () => {
     it('should return the configured container name', () => {
@@ -90,16 +74,11 @@ describe('BlobStorageService', () => {
     });
 
     it('should default to "uploads" when no container name is configured', async () => {
-      const module = await createModule({
-        AZURE_STORAGE_CONTAINER_NAME: undefined,
-        AZURE_STORAGE_CONTAINER: undefined,
-      });
+      const module = await createModule({ containerName: 'uploads' });
       const svc = module.get<BlobStorageService>(BlobStorageService);
       expect(svc.getContainerName()).toBe('uploads');
     });
   });
-
-  // ── uploadBuffer ──────────────────────────────────────────────────────────
 
   describe('uploadBuffer', () => {
     it('should call blockBlobClient.uploadData with buffer and contentType headers', async () => {
@@ -124,30 +103,28 @@ describe('BlobStorageService', () => {
       mockContainerClient.getBlockBlobClient.mockReturnValue({ uploadData: mockUploadData });
 
       await service.uploadBuffer('file.mp3', Buffer.from('data'));
-      expect(mockUploadData).toHaveBeenCalledWith(Buffer.from('data'), expect.objectContaining({
-        blobHTTPHeaders: undefined,
-      }));
+      expect(mockUploadData).toHaveBeenCalledWith(
+        Buffer.from('data'),
+        expect.objectContaining({
+          blobHTTPHeaders: undefined,
+        }),
+      );
     });
   });
 
-  // ── getReadSasUrl ─────────────────────────────────────────────────────────
-
   describe('getReadSasUrl', () => {
     it('should throw InternalServerErrorException when no shared key credentials', async () => {
-      // Service built with connection string only, no account key separately
-      // In our mock setup sharedKeyCredential is null because accountName/Key not set
       const module = await createModule({
-        AZURE_STORAGE_CONNECTION_STRING: 'DefaultEndpointsProtocol=https;AccountName=test;AccountKey=dGVzdA==;EndpointSuffix=core.windows.net',
-        AZURE_STORAGE_ACCOUNT_NAME: undefined,
-        AZURE_STORAGE_ACCOUNT_KEY: undefined,
+        connectionString:
+          'DefaultEndpointsProtocol=https;AccountName=test;AccountKey=dGVzdA==;EndpointSuffix=core.windows.net',
+        accountName: null,
+        accountKey: null,
       });
       const svc = module.get<BlobStorageService>(BlobStorageService);
 
       expect(() => svc.getReadSasUrl('file.mp3')).toThrow(InternalServerErrorException);
     });
   });
-
-  // ── deleteBlob ────────────────────────────────────────────────────────────
 
   describe('deleteBlob', () => {
     it('should call deleteIfExists on the blob client', async () => {

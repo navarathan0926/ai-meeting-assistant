@@ -7,6 +7,7 @@ import { MeetingStatus } from '../meetings/enums/meeting-status.enum';
 import { TranscriptionsService } from '../transcriptions/transcriptions.service';
 import { SummariesService } from '../summaries/summaries.service';
 import { BlobStorageService } from '../storage/blob-storage.service';
+import { ItemExtractionService } from '../extracted-items/item-extraction.service';
 import { Transcription } from '../transcriptions/entities/transcription.entity';
 import { Summary } from '../summaries/entities/summary.entity';
 
@@ -62,6 +63,7 @@ describe('ExtractionProcessor', () => {
   let transcriptionsService: jest.Mocked<TranscriptionsService>;
   let summariesService: jest.Mocked<SummariesService>;
   let blobStorageService: jest.Mocked<BlobStorageService>;
+  let itemExtractionService: jest.Mocked<ItemExtractionService>;
 
   const mockCleanup = jest.fn().mockResolvedValue(undefined);
   let savedStatusesTracker: MeetingStatus[] = [];
@@ -106,6 +108,12 @@ describe('ExtractionProcessor', () => {
             }),
           },
         },
+        {
+          provide: ItemExtractionService,
+          useValue: {
+            addExtractItemsJob: jest.fn().mockResolvedValue('item-job-1'),
+          },
+        },
       ],
     }).compile();
 
@@ -114,6 +122,7 @@ describe('ExtractionProcessor', () => {
     transcriptionsService = module.get(TranscriptionsService);
     summariesService = module.get(SummariesService);
     blobStorageService = module.get(BlobStorageService);
+    itemExtractionService = module.get(ItemExtractionService);
   });
 
   // ── process — meeting not found ───────────────────────────────────────────
@@ -156,6 +165,10 @@ describe('ExtractionProcessor', () => {
       expect(summariesService.summariseTranscript).toHaveBeenCalledWith({
         transcript: transcription.text,
       });
+
+      expect(itemExtractionService.addExtractItemsJob).toHaveBeenCalledWith(
+        'meeting-uuid',
+      );
     });
 
     it('should call cleanup in the finally block even on success', async () => {

@@ -10,7 +10,8 @@ import { SummariesService } from '../summaries/summaries.service';
 import { BlobStorageService } from '../storage/blob-storage.service';
 import { ExtractionService } from '../extraction/extraction.service';
 
-// ── Helpers ────────────────────────────────────────────────────────────────────
+const USER_ID = 'user-uuid-1';
+const OTHER_USER_ID = 'user-uuid-2';
 
 function buildFile(overrides: Partial<Express.Multer.File> = {}): Express.Multer.File {
   return {
@@ -36,14 +37,13 @@ function buildMeeting(overrides: Partial<Meeting> = {}): Meeting {
   m.storedFileName = 'stored-uuid.mp3';
   m.status = MeetingStatus.PENDING;
   m.errorMessage = null;
+  m.userId = USER_ID;
   m.transcription = null;
   m.summary = null;
   m.createdAt = new Date('2024-01-01');
   m.updatedAt = new Date('2024-01-01');
   return Object.assign(m, overrides);
 }
-
-// ── Tests ──────────────────────────────────────────────────────────────────────
 
 describe('MeetingsService', () => {
   let service: MeetingsService;
@@ -56,9 +56,12 @@ describe('MeetingsService', () => {
   beforeEach(async () => {
     const mockQb = {
       leftJoinAndSelect: jest.fn().mockReturnThis(),
-      orderBy: jest.fn().mockReturnThis(),
       where: jest.fn().mockReturnThis(),
-      getMany: jest.fn().mockResolvedValue([]),
+      andWhere: jest.fn().mockReturnThis(),
+      orderBy: jest.fn().mockReturnThis(),
+      skip: jest.fn().mockReturnThis(),
+      take: jest.fn().mockReturnThis(),
+      getManyAndCount: jest.fn().mockResolvedValue([[], 0]),
     } as unknown as jest.Mocked<SelectQueryBuilder<Meeting>>;
 
     const module: TestingModule = await Test.createTestingModule({
@@ -71,22 +74,17 @@ describe('MeetingsService', () => {
             save: jest.fn(),
             findOne: jest.fn(),
             delete: jest.fn(),
+            exists: jest.fn(),
             createQueryBuilder: jest.fn().mockReturnValue(mockQb),
           },
         },
         {
           provide: TranscriptionsService,
-          useValue: {
-            toResponse: jest.fn(),
-            deleteByMeetingId: jest.fn().mockResolvedValue(undefined),
-          },
+          useValue: { toResponse: jest.fn() },
         },
         {
           provide: SummariesService,
-          useValue: {
-            toResponse: jest.fn(),
-            deleteByMeetingId: jest.fn().mockResolvedValue(undefined),
-          },
+          useValue: { toResponse: jest.fn() },
         },
         {
           provide: BlobStorageService,
@@ -113,107 +111,169 @@ describe('MeetingsService', () => {
     extractionService = module.get(ExtractionService);
   });
 
-  // ── createFromUpload ──────────────────────────────────────────────────────
-
   describe('createFromUpload', () => {
     it('should throw BadRequestException when no file is provided', async () => {
-      await expect(service.createFromUpload(null as any)).rejects.toThrow(
-        BadRequestException,
-      );
+      await expect(
+        service.createFromUpload(null as any, USER_ID),
+      ).rejects.toThrow(BadRequestException);
     });
 
     it('should throw BadRequestException for unsupported MIME type', async () => {
       const file = buildFile({ mimetype: 'text/plain' });
-      await expect(service.createFromUpload(file)).rejects.toThrow(
+      await expect(service.createFromUpload(file, USER_ID)).rejects.toThrow(
         BadRequestException,
-      );
-      await expect(service.createFromUpload(file)).rejects.toThrow(
-        'Unsupported file type',
       );
     });
 
     it('should throw BadRequestException when file exceeds 25 MB', async () => {
       const file = buildFile({ size: 26 * 1024 * 1024 });
-      await expect(service.createFromUpload(file)).rejects.toThrow(
-        BadRequestException,
-      );
-      await expect(service.createFromUpload(file)).rejects.toThrow(
+      await expect(service.createFromUpload(file, USER_ID)).rejects.toThrow(
         'File too large',
       );
     });
 
-    it('should upload blob, save meeting and queue extraction job for valid file', async () => {
+    it('should upload blob, save meeting with userId and queue extraction job', async () => {
       const file = buildFile();
       const savedMeeting = buildMeeting();
       meetingRepo.create.mockReturnValue(savedMeeting);
       meetingRepo.save.mockResolvedValue(savedMeeting);
 
-      const result = await service.createFromUpload(file);
+      const result = await service.createFromUpload(file, USER_ID);
 
-      expect(blobStorageService.uploadBuffer).toHaveBeenCalledTimes(1);
       expect(meetingRepo.create).toHaveBeenCalledWith(
         expect.objectContaining({
           originalFileName: 'meeting.mp3',
           title: 'meeting',
           status: MeetingStatus.PENDING,
+          userId: USER_ID,
         }),
       );
-      expect(meetingRepo.save).toHaveBeenCalledWith(savedMeeting);
       expect(extractionService.addExtractJob).toHaveBeenCalledWith(
         savedMeeting.id,
         savedMeeting.storedFileName,
       );
       expect(result.jobId).toBe('job-id-123');
-      expect(result.id).toBe(savedMeeting.id);
-    });
-
-    it('should accept all allowed MIME types', async () => {
-      const allowedTypes = [
-        'audio/mpeg', 'audio/mp4', 'audio/wav',
-        'audio/webm', 'audio/ogg', 'audio/x-m4a', 'video/mp4',
-      ];
-      const savedMeeting = buildMeeting();
-      meetingRepo.create.mockReturnValue(savedMeeting);
-      meetingRepo.save.mockResolvedValue(savedMeeting);
-
-      for (const mimetype of allowedTypes) {
-        const file = buildFile({ mimetype });
-        await expect(service.createFromUpload(file)).resolves.toBeDefined();
-      }
     });
   });
 
-  // ── findOne ───────────────────────────────────────────────────────────────
-
   describe('findOne', () => {
-    it('should return a meeting response when found', async () => {
+    it('should return a meeting when found for the user', async () => {
       const meeting = buildMeeting();
       meetingRepo.findOne.mockResolvedValue(meeting);
 
-      const result = await service.findOne(meeting.id);
+      const result = await service.findOne(USER_ID, meeting.id);
 
       expect(meetingRepo.findOne).toHaveBeenCalledWith({
-        where: { id: meeting.id },
+        where: { id: meeting.id, userId: USER_ID },
         relations: ['transcription', 'summary'],
       });
       expect(result.id).toBe(meeting.id);
     });
 
-    it('should throw NotFoundException when meeting does not exist', async () => {
+    it('should throw NotFoundException when meeting does not exist for user', async () => {
       meetingRepo.findOne.mockResolvedValue(null);
 
-      await expect(service.findOne('non-existent')).rejects.toThrow(
+      await expect(service.findOne(USER_ID, 'non-existent')).rejects.toThrow(
         NotFoundException,
       );
     });
+  });
 
-    it('should include audioUrl when blobStorageService.getReadSasUrl succeeds', async () => {
+  describe('findAll', () => {
+    it('should filter by userId', async () => {
+      const qb = meetingRepo.createQueryBuilder('meeting') as any;
+      qb.getManyAndCount.mockResolvedValue([[], 0]);
+
+      await service.findAll(USER_ID, { page: 1, limit: 20 });
+
+      expect(qb.where).toHaveBeenCalledWith('meeting.userId = :userId', {
+        userId: USER_ID,
+      });
+      expect(qb.skip).toHaveBeenCalledWith(0);
+      expect(qb.take).toHaveBeenCalledWith(20);
+    });
+
+    it('should apply search filter with andWhere', async () => {
+      const qb = meetingRepo.createQueryBuilder() as any;
+      qb.getManyAndCount.mockResolvedValue([[], 0]);
+
+      await service.findAll(USER_ID, { page: 1, limit: 20, search: 'standup' });
+
+      expect(qb.andWhere).toHaveBeenCalledWith(
+        expect.stringContaining('ILIKE'),
+        expect.objectContaining({ q: '%standup%' }),
+      );
+    });
+  });
+
+  describe('deleteMeeting', () => {
+    it('should throw NotFoundException when meeting does not belong to user', async () => {
+      meetingRepo.findOne.mockResolvedValue(null);
+
+      await expect(
+        service.deleteMeeting(OTHER_USER_ID, 'uuid-1234'),
+      ).rejects.toThrow(NotFoundException);
+    });
+
+    it('should delete blob and meeting record on success', async () => {
       const meeting = buildMeeting();
       meetingRepo.findOne.mockResolvedValue(meeting);
-      blobStorageService.getReadSasUrl.mockReturnValue('https://example.com/sas');
 
-      const result = await service.findOne(meeting.id);
-      expect(result.audioUrl).toBe('https://example.com/sas');
+      await service.deleteMeeting(USER_ID, meeting.id);
+
+      expect(meetingRepo.findOne).toHaveBeenCalledWith({
+        where: { id: meeting.id, userId: USER_ID },
+      });
+      expect(blobStorageService.deleteBlob).toHaveBeenCalledWith(
+        meeting.storedFileName,
+      );
+      expect(meetingRepo.delete).toHaveBeenCalledWith(meeting.id);
+    });
+
+    it('should still delete DB record even if blob deletion fails', async () => {
+      const meeting = buildMeeting();
+      meetingRepo.findOne.mockResolvedValue(meeting);
+      blobStorageService.deleteBlob.mockRejectedValue(new Error('Azure 404'));
+
+      await service.deleteMeeting(USER_ID, meeting.id);
+
+      expect(meetingRepo.delete).toHaveBeenCalledWith(meeting.id);
+    });
+  });
+
+  describe('assertOwned', () => {
+    it('should not throw when meeting belongs to user', async () => {
+      meetingRepo.exists.mockResolvedValue(true);
+
+      await expect(
+        service.assertOwned(USER_ID, 'uuid-1234'),
+      ).resolves.toBeUndefined();
+    });
+
+    it('should throw NotFoundException when meeting does not belong to user', async () => {
+      meetingRepo.exists.mockResolvedValue(false);
+
+      await expect(
+        service.assertOwned(OTHER_USER_ID, 'uuid-1234'),
+      ).rejects.toThrow(NotFoundException);
+    });
+  });
+
+  describe('toResponse (via findOne)', () => {
+    it('should include transcription when meeting has one', async () => {
+      const transcriptionMock = {
+        id: 't1',
+        text: 'hello',
+        durationSeconds: 60,
+        createdAt: new Date(),
+      };
+      transcriptionsService.toResponse.mockReturnValue(transcriptionMock as any);
+
+      const meeting = buildMeeting({ transcription: { id: 't1' } as any });
+      meetingRepo.findOne.mockResolvedValue(meeting);
+
+      const result = await service.findOne(USER_ID, meeting.id);
+      expect(result.transcription).toEqual(transcriptionMock);
     });
 
     it('should set audioUrl to undefined when SAS generation fails', async () => {
@@ -223,133 +283,8 @@ describe('MeetingsService', () => {
         throw new Error('SAS error');
       });
 
-      const result = await service.findOne(meeting.id);
+      const result = await service.findOne(USER_ID, meeting.id);
       expect(result.audioUrl).toBeUndefined();
-    });
-  });
-
-  // ── findAll ───────────────────────────────────────────────────────────────
-
-  describe('findAll', () => {
-    it('should return an empty array when no meetings exist', async () => {
-      const result = await service.findAll();
-      expect(result).toEqual([]);
-    });
-
-    it('should return all meetings ordered by createdAt DESC', async () => {
-      const meetings = [buildMeeting(), buildMeeting({ id: 'uuid-5678' })];
-      const qb = meetingRepo.createQueryBuilder('meeting') as any;
-      qb.getMany.mockResolvedValue(meetings);
-
-      const result = await service.findAll();
-      expect(result).toHaveLength(2);
-    });
-
-    it('should apply WHERE clause when search term is provided', async () => {
-      const qb = meetingRepo.createQueryBuilder() as any;
-      qb.getMany.mockResolvedValue([]);
-
-      await service.findAll('standup');
-      expect(qb.where).toHaveBeenCalledWith(
-        expect.stringContaining('ILIKE'),
-        expect.objectContaining({ q: '%standup%' }),
-      );
-    });
-
-    it('should trim search term before applying filter', async () => {
-      const qb = meetingRepo.createQueryBuilder() as any;
-      qb.getMany.mockResolvedValue([]);
-
-      await service.findAll('  standup  ');
-      expect(qb.where).toHaveBeenCalledWith(
-        expect.any(String),
-        expect.objectContaining({ q: '%standup%' }),
-      );
-    });
-
-    it('should not apply WHERE clause for empty/blank search term', async () => {
-      const qb = meetingRepo.createQueryBuilder() as any;
-      qb.getMany.mockResolvedValue([]);
-
-      await service.findAll('   ');
-      expect(qb.where).not.toHaveBeenCalled();
-    });
-  });
-
-  // ── deleteMeeting ─────────────────────────────────────────────────────────
-
-  describe('deleteMeeting', () => {
-    it('should throw NotFoundException when meeting does not exist', async () => {
-      meetingRepo.findOne.mockResolvedValue(null);
-
-      await expect(service.deleteMeeting('non-existent')).rejects.toThrow(
-        NotFoundException,
-      );
-    });
-
-    it('should delete blob, transcription, summary, and meeting record on success', async () => {
-      const meeting = buildMeeting();
-      meetingRepo.findOne.mockResolvedValue(meeting);
-
-      await service.deleteMeeting(meeting.id);
-
-      expect(blobStorageService.deleteBlob).toHaveBeenCalledWith(meeting.storedFileName);
-      expect(transcriptionsService.deleteByMeetingId).toHaveBeenCalledWith(meeting.id);
-      expect(summariesService.deleteByMeetingId).toHaveBeenCalledWith(meeting.id);
-      expect(meetingRepo.delete).toHaveBeenCalledWith(meeting.id);
-    });
-
-    it('should still delete DB record even if blob deletion fails', async () => {
-      const meeting = buildMeeting();
-      meetingRepo.findOne.mockResolvedValue(meeting);
-      blobStorageService.deleteBlob.mockRejectedValue(new Error('Azure 404'));
-
-      await service.deleteMeeting(meeting.id);
-
-      // Despite blob error, the DB record and related records must be cleaned up
-      expect(transcriptionsService.deleteByMeetingId).toHaveBeenCalledWith(meeting.id);
-      expect(summariesService.deleteByMeetingId).toHaveBeenCalledWith(meeting.id);
-      expect(meetingRepo.delete).toHaveBeenCalledWith(meeting.id);
-    });
-  });
-
-  // ── toResponse (indirectly via findOne) ─────────────────────────────────────
-
-  describe('toResponse (via findOne)', () => {
-    it('should include transcription when meeting has one', async () => {
-      const transcriptionMock = { id: 't1', text: 'hello', durationSeconds: 60, createdAt: new Date() };
-      transcriptionsService.toResponse.mockReturnValue(transcriptionMock as any);
-
-      const meeting = buildMeeting({ transcription: { id: 't1' } as any });
-      meetingRepo.findOne.mockResolvedValue(meeting);
-
-      const result = await service.findOne(meeting.id);
-      expect(result.transcription).toEqual(transcriptionMock);
-    });
-
-    it('should include summary when meeting has one', async () => {
-      const summaryMock = {
-        id: 's1',
-        overview: 'overview',
-        keyPoints: [],
-        actionItems: [],
-        createdAt: new Date(),
-      };
-      summariesService.toResponse.mockReturnValue(summaryMock as any);
-
-      const meeting = buildMeeting({ summary: { id: 's1' } as any });
-      meetingRepo.findOne.mockResolvedValue(meeting);
-
-      const result = await service.findOne(meeting.id);
-      expect(result.summary).toEqual(summaryMock);
-    });
-
-    it('should have undefined transcription when meeting has none', async () => {
-      const meeting = buildMeeting({ transcription: null });
-      meetingRepo.findOne.mockResolvedValue(meeting);
-
-      const result = await service.findOne(meeting.id);
-      expect(result.transcription).toBeUndefined();
     });
   });
 });

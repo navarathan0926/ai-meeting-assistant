@@ -1,8 +1,6 @@
-import { TransformInterceptor } from './transform.interceptor';
+import { TransformInterceptor, ApiResponse } from './transform.interceptor';
 import { ExecutionContext, CallHandler } from '@nestjs/common';
 import { of } from 'rxjs';
-
-// ── Helpers ────────────────────────────────────────────────────────────────────
 
 function buildContext(statusCode = 200): ExecutionContext {
   return {
@@ -12,16 +10,23 @@ function buildContext(statusCode = 200): ExecutionContext {
   } as unknown as ExecutionContext;
 }
 
-function buildHandler(data: any): CallHandler {
+function buildHandler(data: unknown): CallHandler {
   return {
     handle: () => of(data),
   };
 }
 
-// ── Tests ──────────────────────────────────────────────────────────────────────
+function expectApiResponse(
+  result: ApiResponse<unknown> | void,
+): asserts result is ApiResponse<unknown> {
+  expect(result).toBeDefined();
+  if (!result || typeof result !== 'object' || !('data' in result)) {
+    throw new Error('Expected wrapped API response');
+  }
+}
 
 describe('TransformInterceptor', () => {
-  let interceptor: TransformInterceptor<any>;
+  let interceptor: TransformInterceptor<unknown>;
 
   beforeEach(() => {
     interceptor = new TransformInterceptor();
@@ -32,6 +37,7 @@ describe('TransformInterceptor', () => {
     const handler = buildHandler({ id: '1', name: 'test' });
 
     interceptor.intercept(ctx, handler).subscribe((result) => {
+      expectApiResponse(result);
       expect(result.data).toEqual({ id: '1', name: 'test' });
       expect(result.statusCode).toBe(200);
       expect(result.timestamp).toBeDefined();
@@ -45,6 +51,7 @@ describe('TransformInterceptor', () => {
     const handler = buildHandler({ jobId: 'abc' });
 
     interceptor.intercept(ctx, handler).subscribe((result) => {
+      expectApiResponse(result);
       expect(result.statusCode).toBe(202);
       done();
     });
@@ -56,6 +63,7 @@ describe('TransformInterceptor', () => {
     const handler = buildHandler({});
 
     interceptor.intercept(ctx, handler).subscribe((result) => {
+      expectApiResponse(result);
       const ts = new Date(result.timestamp);
       expect(ts.getTime()).toBeGreaterThanOrEqual(before.getTime());
       done();
@@ -67,6 +75,7 @@ describe('TransformInterceptor', () => {
     const handler = buildHandler(null);
 
     interceptor.intercept(ctx, handler).subscribe((result) => {
+      expectApiResponse(result);
       expect(result.data).toBeNull();
       done();
     });
@@ -77,8 +86,19 @@ describe('TransformInterceptor', () => {
     const handler = buildHandler([{ id: '1' }, { id: '2' }]);
 
     interceptor.intercept(ctx, handler).subscribe((result) => {
+      expectApiResponse(result);
       expect(Array.isArray(result.data)).toBe(true);
       expect(result.data).toHaveLength(2);
+      done();
+    });
+  });
+
+  it('should skip wrapping for 204 No Content responses', (done) => {
+    const ctx = buildContext(204);
+    const handler = buildHandler(undefined);
+
+    interceptor.intercept(ctx, handler).subscribe((result) => {
+      expect(result).toBeUndefined();
       done();
     });
   });

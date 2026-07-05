@@ -41,15 +41,6 @@ export function MeetingResults({ meeting }: MeetingResultsProps) {
         </div>
       </div>
 
-      {/* ── Audio player ─────────────────────────────────────────────── */}
-      {meeting.audioUrl && (
-        <section className="rounded-2xl border border-white/10 bg-white/5 p-5">
-          <SectionTitle icon="🎧" title="Recording" />
-          {/* eslint-disable-next-line jsx-a11y/media-has-caption */}
-          <audio controls className="mt-3 w-full" src={meeting.audioUrl} />
-        </section>
-      )}
-
       {/* ── Summary overview ────────────────────────────────────────── */}
       {summary && (
         <section className="rounded-2xl border border-white/10 bg-white/5 p-5">

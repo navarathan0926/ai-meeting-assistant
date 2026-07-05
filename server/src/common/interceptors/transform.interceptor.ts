@@ -14,29 +14,32 @@ export interface ApiResponse<T> {
 }
 
 /**
- * TransformInterceptor
- * Wraps every successful controller response in a consistent envelope:
- * { data: <payload>, statusCode: 200, timestamp: "..." }
- *
- * Registered globally in main.ts — controllers just return their
- * plain objects/DTOs and the interceptor handles the envelope.
+ * Wraps successful controller responses in a consistent envelope.
+ * Skips wrapping for 204 No Content responses.
  */
 @Injectable()
 export class TransformInterceptor<T>
-  implements NestInterceptor<T, ApiResponse<T>>
+  implements NestInterceptor<T, ApiResponse<T> | void>
 {
   intercept(
     context: ExecutionContext,
     next: CallHandler,
-  ): Observable<ApiResponse<T>> {
-    const statusCode = context.switchToHttp().getResponse().statusCode;
+  ): Observable<ApiResponse<T> | void> {
+    const response = context.switchToHttp().getResponse();
+    const statusCode = response.statusCode;
 
     return next.handle().pipe(
-      map((data) => ({
-        data,
-        statusCode,
-        timestamp: new Date().toISOString(),
-      })),
+      map((data) => {
+        if (statusCode === 204 || data === undefined) {
+          return undefined;
+        }
+
+        return {
+          data,
+          statusCode,
+          timestamp: new Date().toISOString(),
+        };
+      }),
     );
   }
 }

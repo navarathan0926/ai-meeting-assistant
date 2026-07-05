@@ -15,47 +15,51 @@ const statusBadge: Record<MeetingStatus, string> = {
 interface MeetingHistoryProps {
   activeMeetingId?: string | null;
   onSelect: (id: string) => void;
-  /** Called with the deleted meeting ID so the parent can clear the active view */
   onDelete?: (id: string) => void;
 }
 
-
-/**
- * MeetingHistory
- * Left-panel list of past meetings.
- * Clicking an item calls onSelect so the parent can show results.
- */
-export function MeetingHistory({ activeMeetingId, onSelect, onDelete }: MeetingHistoryProps) {
-  const { data: meetings, isLoading } = useMeetings();
-
-  if (isLoading) {
-    return (
-      <div className="flex items-center justify-center h-24 text-white/30 text-sm">
-        Loading history…
-      </div>
-    );
-  }
-
-  if (!meetings || meetings.length === 0) {
-    return (
-      <div className="flex items-center justify-center h-24 text-white/30 text-sm">
-        No meetings yet.
-      </div>
-    );
-  }
+export function MeetingHistory({
+  activeMeetingId,
+  onSelect,
+  onDelete,
+}: MeetingHistoryProps) {
+  const [search, setSearch] = useState('');
+  const { data, isLoading } = useMeetings(search);
+  const meetings = data?.items ?? [];
 
   return (
-    <ul className="flex flex-col gap-2">
-      {meetings.map((meeting) => (
-        <MeetingHistoryItem
-          key={meeting.id}
-          meeting={meeting}
-          isActive={meeting.id === activeMeetingId}
-          onClick={() => onSelect(meeting.id)}
-          onDelete={onDelete}
-        />
-      ))}
-    </ul>
+    <div className="flex flex-col gap-3">
+      <input
+        type="search"
+        value={search}
+        onChange={(e) => setSearch(e.target.value)}
+        placeholder="Search recordings…"
+        aria-label="Search recordings"
+        className="w-full rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-sm text-white placeholder:text-white/35 focus:outline-none focus:border-indigo-500/50"
+      />
+
+      {isLoading ? (
+        <div className="flex items-center justify-center h-24 text-white/30 text-sm">
+          Loading history…
+        </div>
+      ) : meetings.length === 0 ? (
+        <div className="flex items-center justify-center h-24 text-white/30 text-sm">
+          {search.trim() ? 'No matching meetings.' : 'No meetings yet.'}
+        </div>
+      ) : (
+        <ul className="flex flex-col gap-2">
+          {meetings.map((meeting) => (
+            <MeetingHistoryItem
+              key={meeting.id}
+              meeting={meeting}
+              isActive={meeting.id === activeMeetingId}
+              onClick={() => onSelect(meeting.id)}
+              onDelete={onDelete}
+            />
+          ))}
+        </ul>
+      )}
+    </div>
   );
 }
 
@@ -66,12 +70,19 @@ interface MeetingHistoryItemProps {
   onDelete?: (id: string) => void;
 }
 
-function MeetingHistoryItem({ meeting, isActive, onClick, onDelete }: MeetingHistoryItemProps) {
+function MeetingHistoryItem({
+  meeting,
+  isActive,
+  onClick,
+  onDelete,
+}: MeetingHistoryItemProps) {
   const [isModalOpen, setIsModalOpen] = useState(false);
-  const { mutate: deleteMeeting, isPending: isDeleting } = useDeleteMeeting((id) => {
-    setIsModalOpen(false);
-    onDelete?.(id);
-  });
+  const { mutate: deleteMeeting, isPending: isDeleting } = useDeleteMeeting(
+    (id) => {
+      setIsModalOpen(false);
+      onDelete?.(id);
+    },
+  );
 
   const date = new Date(meeting.createdAt).toLocaleDateString('en-US', {
     month: 'short',
@@ -81,7 +92,7 @@ function MeetingHistoryItem({ meeting, isActive, onClick, onDelete }: MeetingHis
   });
 
   const handleDeleteClick = (e: React.MouseEvent) => {
-    e.stopPropagation(); // don't trigger the select-meeting click
+    e.stopPropagation();
     setIsModalOpen(true);
   };
 
@@ -97,10 +108,7 @@ function MeetingHistoryItem({ meeting, isActive, onClick, onDelete }: MeetingHis
             : 'hover:bg-white/5 border border-transparent',
         ].join(' ')}
       >
-        <button
-          onClick={onClick}
-          className="w-full text-left px-4 py-3"
-        >
+        <button onClick={onClick} className="w-full text-left px-4 py-3">
           <p className="text-white/85 text-sm font-medium truncate pr-6">
             {meeting.originalFileName}
           </p>
@@ -114,7 +122,6 @@ function MeetingHistoryItem({ meeting, isActive, onClick, onDelete }: MeetingHis
           </div>
         </button>
 
-        {/* Delete button — visible on mobile, visible on hover/focus on desktop */}
         <button
           onClick={handleDeleteClick}
           disabled={isDeleting}
@@ -137,25 +144,27 @@ function MeetingHistoryItem({ meeting, isActive, onClick, onDelete }: MeetingHis
         </button>
       </div>
 
-      {/* Confirmation Modal */}
       <ConfirmationModal
         isOpen={isModalOpen}
         title="Delete Recording"
         message={
           <>
-            Are you sure you want to permanently delete &quot;{meeting.originalFileName.length > maxLength
+            Are you sure you want to permanently delete &quot;
+            {meeting.originalFileName.length > maxLength
               ? meeting.originalFileName.slice(0, maxLength) + '...'
-              : meeting.originalFileName
-            }&quot;?
+              : meeting.originalFileName}
+            &quot;?
             <br />
             <br />
-            This will remove the audio file and all generated AI transcripts and summaries.
+            This will remove the audio file and all generated AI transcripts and
+            summaries.
             <br />
             This action cannot be undone.
           </>
         }
         confirmLabel="Delete"
         cancelLabel="Cancel"
+        confirmingLabel="Deleting..."
         isConfirming={isDeleting}
         onConfirm={() => deleteMeeting(meeting.id)}
         onCancel={() => setIsModalOpen(false)}
