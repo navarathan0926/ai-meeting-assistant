@@ -26,6 +26,7 @@ import { authConfiguration } from '../common/config/auth.config';
 import {
   clearAuthCookie,
   parseJwtDurationToMs,
+  resolveAuthCookieDomain,
   setAuthCookie,
 } from './auth-cookie.util';
 import { toUserProfile, UserProfileResponse } from './interfaces/user-profile.interface';
@@ -48,10 +49,21 @@ export class AuthController {
     private readonly authConfig: ConfigType<typeof authConfiguration>,
   ) {}
 
+  private authCookieOptions() {
+    const isProduction = this.appConfig.nodeEnv === 'production';
+
+    return {
+      secure: isProduction,
+      domain: isProduction
+        ? resolveAuthCookieDomain(this.appConfig.clientUrl)
+        : undefined,
+    };
+  }
+
   private applyAuthCookie(res: Response, accessToken: string): void {
     setAuthCookie(res, accessToken, {
+      ...this.authCookieOptions(),
       maxAgeMs: parseJwtDurationToMs(this.authConfig.jwtExpiresIn),
-      secure: this.appConfig.nodeEnv === 'production',
     });
   }
 
@@ -121,6 +133,6 @@ export class AuthController {
   @Post('logout')
   @HttpCode(HttpStatus.NO_CONTENT)
   logout(@Res({ passthrough: true }) res: Response): void {
-    clearAuthCookie(res, this.appConfig.nodeEnv === 'production');
+    clearAuthCookie(res, this.authCookieOptions());
   }
 }
