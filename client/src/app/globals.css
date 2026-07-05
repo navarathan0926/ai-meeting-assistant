@@ -1,5 +1,11 @@
 @import "tailwindcss";
 
+@theme {
+  --color-bg: #09090f;
+  --color-accent-bright: #39ff14;
+  --font-sans: var(--font-geist-sans, system-ui, sans-serif);
+}
+
 /* ── Design tokens ───────────────────────────────────────────────── */
 :root {
   --color-bg: #09090f;
@@ -69,6 +75,363 @@ body {
 
 .animate-fade-in {
   animation: fade-in 0.2s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+/* ── Jira document rendering ─────────────────────────────────────── */
+.jira-document {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  font-size: 0.875rem;
+  line-height: 1.6;
+  color: rgba(255, 255, 255, 0.82);
+}
+
+.jira-document-h2 {
+  font-size: 1rem;
+  font-weight: 700;
+  color: rgba(255, 255, 255, 0.95);
+  margin-top: 0.25rem;
+}
+
+.jira-document-h1 {
+  font-size: 1.125rem;
+  font-weight: 700;
+  color: rgba(255, 255, 255, 0.98);
+  margin-top: 0.25rem;
+}
+
+.jira-document-h3 {
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: rgba(255, 255, 255, 0.9);
+}
+
+.jira-document-p {
+  margin: 0;
+  white-space: pre-wrap;
+}
+
+.jira-document-ul,
+.jira-document-ol {
+  margin: 0;
+  padding-left: 1.25rem;
+}
+
+.jira-document-ul li {
+  list-style-type: disc;
+}
+
+.jira-document-ol li {
+  list-style-type: decimal;
+}
+
+.jira-document-table-wrap {
+  overflow-x: auto;
+}
+
+.jira-document-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.8125rem;
+}
+
+.jira-document-table th,
+.jira-document-table td {
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  padding: 0.5rem 0.75rem;
+  text-align: left;
+}
+
+.jira-document-table th {
+  background: rgba(255, 255, 255, 0.06);
+  font-weight: 600;
+}
+
+/* ── Rich description editor (Jira-style) ─────────────────────────── */
+.rich-description-editor {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.rich-description-editor__panel {
+  overflow: hidden;
+  border-radius: 0.5rem;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  background: rgba(255, 255, 255, 0.05);
+}
+
+.rich-description-editor__toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.25rem;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  padding: 0.5rem 0.75rem;
+}
+
+.rich-description-editor__style-select {
+  border-radius: 0.375rem;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  background: rgba(0, 0, 0, 0.25);
+  padding: 0.25rem 0.5rem;
+  font-size: 0.75rem;
+  color: rgba(255, 255, 255, 0.85);
+}
+
+.rich-description-editor__dropdown {
+  position: relative;
+}
+
+.rich-description-editor__dropdown-trigger {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.375rem;
+  border-radius: 0.375rem;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  background: rgba(0, 0, 0, 0.25);
+  padding: 0.25rem 0.5rem;
+  font-size: 0.75rem;
+  color: rgba(255, 255, 255, 0.88);
+  cursor: pointer;
+}
+
+.rich-description-editor__dropdown-trigger:hover:not(:disabled) {
+  background: rgba(255, 255, 255, 0.08);
+  color: rgba(255, 255, 255, 0.98);
+}
+
+.rich-description-editor__dropdown-label {
+  white-space: nowrap;
+}
+
+.rich-description-editor__dropdown-icon {
+  display: inline-flex;
+  color: rgba(255, 255, 255, 0.78);
+}
+
+.rich-description-editor__dropdown-icon--active {
+  color: rgba(165, 180, 252, 0.95);
+}
+
+.rich-description-editor__dropdown-menu {
+  position: absolute;
+  top: calc(100% + 0.25rem);
+  left: 0;
+  z-index: 20;
+  min-width: 10.5rem;
+  overflow: hidden;
+  border-radius: 0.5rem;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  background: #1f1f1f;
+  padding: 0.25rem;
+  box-shadow: 0 10px 24px rgba(0, 0, 0, 0.45);
+}
+
+.rich-description-editor__dropdown--end .rich-description-editor__dropdown-menu {
+  left: auto;
+  right: 0;
+}
+
+.rich-description-editor__dropdown-item {
+  display: flex;
+  width: 100%;
+  align-items: center;
+  gap: 0.5rem;
+  border: none;
+  border-radius: 0.375rem;
+  background: transparent;
+  padding: 0.45rem 0.625rem;
+  font-size: 0.8125rem;
+  color: rgba(255, 255, 255, 0.92);
+  text-align: left;
+  cursor: pointer;
+}
+
+.rich-description-editor__dropdown-item:hover {
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.rich-description-editor__dropdown-item--active {
+  background: rgba(99, 102, 241, 0.18);
+  color: rgba(255, 255, 255, 0.98);
+}
+
+.rich-description-editor__dropdown-item-icon {
+  display: inline-flex;
+  flex-shrink: 0;
+  color: rgba(255, 255, 255, 0.72);
+}
+
+.rich-description-editor__dropdown-item--active
+  .rich-description-editor__dropdown-item-icon {
+  color: rgba(199, 210, 254, 0.95);
+}
+
+.rich-description-editor__toolbar-divider {
+  width: 1px;
+  height: 1.25rem;
+  margin: 0 0.25rem;
+  background: rgba(255, 255, 255, 0.12);
+}
+
+.rich-description-editor__toolbar-btn {
+  min-width: 1.75rem;
+  border-radius: 0.375rem;
+  border: 1px solid transparent;
+  background: transparent;
+  padding: 0.25rem 0.5rem;
+  font-size: 0.8125rem;
+  font-weight: 600;
+  color: rgba(255, 255, 255, 0.75);
+  cursor: pointer;
+}
+
+.rich-description-editor__toolbar-btn:hover:not(:disabled) {
+  background: rgba(255, 255, 255, 0.08);
+  color: rgba(255, 255, 255, 0.95);
+}
+
+.rich-description-editor__toolbar-btn--active {
+  border-color: rgba(99, 102, 241, 0.45);
+  background: rgba(99, 102, 241, 0.18);
+  color: rgba(255, 255, 255, 0.95);
+}
+
+.rich-description-editor__toolbar-btn:disabled,
+.rich-description-editor__style-select:disabled,
+.rich-description-editor__dropdown-trigger:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.rich-description-editor__content .tiptap {
+  min-height: 7rem;
+  padding: 0.75rem;
+  font-size: 0.875rem;
+  line-height: 1.6;
+  color: rgba(255, 255, 255, 0.85);
+  outline: none;
+}
+
+.rich-description-editor__content .tiptap p {
+  margin: 0 0 0.5rem;
+}
+
+.rich-description-editor__content .tiptap p:last-child {
+  margin-bottom: 0;
+}
+
+.rich-description-editor__content .tiptap h1,
+.rich-description-editor__content .tiptap h2,
+.rich-description-editor__content .tiptap h3 {
+  margin: 0.5rem 0;
+  font-weight: 700;
+  color: rgba(255, 255, 255, 0.95);
+}
+
+.rich-description-editor__content .tiptap h1 {
+  font-size: 1.125rem;
+}
+
+.rich-description-editor__content .tiptap h2 {
+  font-size: 1rem;
+}
+
+.rich-description-editor__content .tiptap h3 {
+  font-size: 0.9rem;
+}
+
+.rich-description-editor__content .tiptap ul,
+.rich-description-editor__content .tiptap ol {
+  margin: 0 0 0.5rem;
+  padding-left: 1.5rem;
+  list-style-position: outside;
+}
+
+.rich-description-editor__content .tiptap ul {
+  list-style-type: disc;
+}
+
+.rich-description-editor__content .tiptap ol {
+  list-style-type: decimal;
+}
+
+.rich-description-editor__content .tiptap li {
+  display: list-item;
+}
+
+.rich-description-editor__content .tiptap li > p {
+  margin: 0;
+}
+
+.rich-description-editor__content .tiptap > p,
+.rich-description-editor__content .tiptap > h2,
+.rich-description-editor__content .tiptap > h3 {
+  padding-left: 0;
+  margin-left: 0;
+}
+
+.rich-description-editor__content .tiptap p.is-editor-empty:first-child::before {
+  content: attr(data-placeholder);
+  float: left;
+  height: 0;
+  pointer-events: none;
+  color: rgba(255, 255, 255, 0.35);
+}
+
+.rich-description-editor__readonly-tables {
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
+  padding: 0.75rem;
+}
+
+.rich-description-editor__readonly-label {
+  margin: 0 0 0.5rem;
+  font-size: 0.6875rem;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: rgba(255, 255, 255, 0.4);
+}
+
+.rich-description-editor__actions {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.rich-description-editor__cancel-btn {
+  border: none;
+  background: transparent;
+  padding: 0;
+  font-size: 0.8125rem;
+  color: rgba(255, 255, 255, 0.75);
+  cursor: pointer;
+}
+
+.rich-description-editor__cancel-btn:hover:not(:disabled) {
+  color: rgba(255, 255, 255, 0.95);
+}
+
+.rich-description-editor__save-btn {
+  border: none;
+  border-radius: 0.375rem;
+  background: #2563eb;
+  padding: 0.375rem 0.875rem;
+  font-size: 0.8125rem;
+  font-weight: 500;
+  color: #fff;
+  cursor: pointer;
+}
+
+.rich-description-editor__save-btn:hover:not(:disabled) {
+  background: #1d4ed8;
+}
+
+.rich-description-editor__save-btn:disabled,
+.rich-description-editor__cancel-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
 }
 
 /* ══════════════════════════════════════════════════════════════════

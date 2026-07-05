@@ -6,32 +6,86 @@ import {
   UseGuards,
   Req,
   Res,
+  HttpCode,
+  HttpStatus,
 } from '@nestjs/common';
-import { Response } from 'express';
+import { Request, Response } from 'express';
+import { ConfigType } from '@nestjs/config';
+import { Inject } from '@nestjs/common';
+import { Throttle } from '@nestjs/throttler';
 import { AuthService } from './auth.service';
 import { RegisterDto } from './dto/register.dto';
 import { LoginDto } from './dto/login.dto';
 import { ExchangeOAuthCodeDto } from './dto/exchange-oauth-code.dto';
 import { Auth } from '../common/decorators/auth.decorator';
+import { CurrentUser } from '../common/decorators/current-user.decorator';
 import { GoogleOauthGuard } from './guards/google-oauth.guard';
+import { User } from './entities/user.entity';
+import { appConfiguration } from '../common/config/app.config';
+import { authConfiguration } from '../common/config/auth.config';
+import {
+  clearAuthCookie,
+  parseJwtDurationToMs,
+  setAuthCookie,
+} from './auth-cookie.util';
+import { toUserProfile, UserProfileResponse } from './interfaces/user-profile.interface';
+
+interface GoogleAuthRequest extends Request {
+  user: {
+    googleId: string;
+    email: string;
+    name: string;
+  };
+}
 
 @Controller('auth')
 export class AuthController {
-  constructor(private readonly authService: AuthService) {}
+  constructor(
+    private readonly authService: AuthService,
+    @Inject(appConfiguration.KEY)
+    private readonly appConfig: ConfigType<typeof appConfiguration>,
+    @Inject(authConfiguration.KEY)
+    private readonly authConfig: ConfigType<typeof authConfiguration>,
+  ) {}
 
+  private applyAuthCookie(res: Response, accessToken: string): void {
+    setAuthCookie(res, accessToken, {
+      maxAgeMs: parseJwtDurationToMs(this.authConfig.jwtExpiresIn),
+      secure: this.appConfig.nodeEnv === 'production',
+    });
+  }
+
+  @Throttle({ default: { limit: 5, ttl: 60_000 } })
   @Post('register')
-  async register(@Body() registerDto: RegisterDto) {
-    return this.authService.register(registerDto);
+  async register(
+    @Body() registerDto: RegisterDto,
+    @Res({ passthrough: true }) res: Response,
+  ) {
+    const result = await this.authService.register(registerDto);
+    this.applyAuthCookie(res, result.accessToken);
+    return { user: result.user };
   }
 
+  @Throttle({ default: { limit: 5, ttl: 60_000 } })
   @Post('login')
-  async login(@Body() loginDto: LoginDto) {
-    return this.authService.login(loginDto);
+  async login(
+    @Body() loginDto: LoginDto,
+    @Res({ passthrough: true }) res: Response,
+  ) {
+    const result = await this.authService.login(loginDto);
+    this.applyAuthCookie(res, result.accessToken);
+    return { user: result.user };
   }
 
+  @Throttle({ default: { limit: 10, ttl: 60_000 } })
   @Post('oauth/exchange')
-  async exchangeOAuthCode(@Body() dto: ExchangeOAuthCodeDto) {
-    return this.authService.exchangeOAuthCode(dto.code);
+  async exchangeOAuthCode(
+    @Body() dto: ExchangeOAuthCodeDto,
+    @Res({ passthrough: true }) res: Response,
+  ) {
+    const result = await this.authService.exchangeOAuthCode(dto.code);
+    this.applyAuthCookie(res, result.accessToken);
+    return { user: result.user };
   }
 
   @Get('google')
@@ -42,7 +96,7 @@ export class AuthController {
 
   @Get('google/callback')
   @UseGuards(GoogleOauthGuard)
-  async googleAuthRedirect(@Req() req: any, @Res() res: Response) {
+  async googleAuthRedirect(@Req() req: GoogleAuthRequest, @Res() res: Response) {
     const result = await this.authService.googleLogin({
       googleId: req.user.googleId,
       email: req.user.email,
@@ -52,13 +106,21 @@ export class AuthController {
     const code = await this.authService.createOAuthRedirectCode(
       result.accessToken,
     );
-    const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:3000';
-    return res.redirect(`${frontendUrl}/login?code=${code}`);
+    return res.redirect(
+      `${this.appConfig.frontendUrl}/login?code=${code}`,
+    );
   }
 
   @Auth()
   @Get('me')
-  async getProfile(@Req() req: any) {
-    return req.user;
+  getProfile(@CurrentUser() user: User): UserProfileResponse {
+    return toUserProfile(user);
+  }
+
+  @Auth()
+  @Post('logout')
+  @HttpCode(HttpStatus.NO_CONTENT)
+  logout(@Res({ passthrough: true }) res: Response): void {
+    clearAuthCookie(res, this.appConfig.nodeEnv === 'production');
   }
 }

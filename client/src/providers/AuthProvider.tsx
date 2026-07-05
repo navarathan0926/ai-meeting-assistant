@@ -8,61 +8,80 @@ import {
   useCallback,
   ReactNode,
 } from 'react';
-import { useRouter } from 'next/navigation';
+import { usePathname, useRouter } from 'next/navigation';
 import { useQueryClient } from '@tanstack/react-query';
-import apiClient from '@/lib/axios';
-import { getToken, setToken, removeToken } from '@/lib/auth';
+import { fetchCurrentUser, logoutUser } from '@/lib/auth';
 import { AuthUser } from '@/types/auth';
 
 interface AuthContextValue {
   user: AuthUser | null;
   isAuthenticated: boolean;
   isLoading: boolean;
-  login: (token: string, user: AuthUser) => void;
-  logout: () => void;
+  login: (user: AuthUser) => void;
+  logout: () => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextValue | null>(null);
 
+const AUTH_PATH_PREFIXES = ['/login', '/register', '/dashboard'];
+
+function pathNeedsAuthBootstrap(pathname: string): boolean {
+  return AUTH_PATH_PREFIXES.some((prefix) => pathname.startsWith(prefix));
+}
+
 export function AuthProvider({ children }: { children: ReactNode }) {
   const router = useRouter();
+  const pathname = usePathname();
   const queryClient = useQueryClient();
   const [user, setUser] = useState<AuthUser | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
-    const token = getToken();
-    if (!token) {
+    if (!pathNeedsAuthBootstrap(pathname)) {
       setIsLoading(false);
       return;
     }
 
-    apiClient
-      .get<{ data: AuthUser }>('/auth/me')
-      .then((res) => {
-        setUser(res.data.data);
+    let cancelled = false;
+    setIsLoading(true);
+
+    fetchCurrentUser()
+      .then((profile) => {
+        if (!cancelled) {
+          setUser(profile);
+        }
       })
       .catch(() => {
-        removeToken();
-        setUser(null);
+        if (!cancelled) {
+          setUser(null);
+        }
       })
       .finally(() => {
-        setIsLoading(false);
+        if (!cancelled) {
+          setIsLoading(false);
+        }
       });
-  }, []);
+
+    return () => {
+      cancelled = true;
+    };
+  }, [pathname]);
 
   const login = useCallback(
-    (token: string, userData: AuthUser) => {
+    (userData: AuthUser) => {
       queryClient.clear();
-      setToken(token);
       setUser(userData);
     },
     [queryClient],
   );
 
-  const logout = useCallback(() => {
+  const logout = useCallback(async () => {
     queryClient.clear();
-    removeToken();
+    try {
+      await logoutUser();
+    } catch {
+      // Cookie may already be cleared; still reset client state.
+    }
     setUser(null);
     router.push('/login');
   }, [queryClient, router]);

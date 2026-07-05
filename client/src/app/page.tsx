@@ -1,113 +1,70 @@
-'use client';
+import Link from 'next/link';
+import { MarketingFooter, MarketingNav } from '@/components/marketing/MarketingShell';
 
-import { useState, useEffect } from 'react';
-import { useRouter } from 'next/navigation';
-import { AudioUpload } from '@/components/upload/AudioUpload';
-import { MeetingResults } from '@/components/results/MeetingResults';
-import { ExtractedItemsReview } from '@/components/extracted-items/ExtractedItemsReview';
-import { MeetingHistory } from '@/components/history/MeetingHistory';
-import { useMeeting } from '@/hooks/useMeeting';
-import { useAuthContext } from '@/providers/AuthProvider';
-import { MeetingStatus } from '@/types/meeting';
-
-/**
- * Home page — the entry point of the AI Meeting Assistant.
- *
- * Layout:
- *  Left panel  — meeting history list
- *  Right panel — upload zone + results
- */
-export default function HomePage() {
-  const router = useRouter();
-  const { user, isAuthenticated, isLoading, logout } = useAuthContext();
-  const [activeMeetingId, setActiveMeetingId] = useState<string | null>(null);
-  const { data: activeMeeting } = useMeeting(activeMeetingId);
-
-  useEffect(() => {
-    if (!isLoading && !isAuthenticated) {
-      router.replace('/login');
-    }
-  }, [isAuthenticated, isLoading, router]);
-
-  if (isLoading) {
-    return (
-      <div className="min-h-screen bg-[#09090f] text-white flex items-center justify-center">
-        <div className="flex flex-col items-center gap-3">
-          <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-[#39FF14]"></div>
-          <p className="text-white/60 text-sm font-mono">Loading...</p>
-        </div>
-      </div>
-    );
-  }
-
-  if (!isAuthenticated) {
-    return null;
-  }
-
+export default function LandingPage() {
   return (
     <div className="min-h-screen bg-[#09090f] text-white flex flex-col">
-      {/* ── Top nav ────────────────────────────────────────────────── */}
-      <header className="border-b border-white/8 px-6 py-4 flex items-center gap-3">
-        <span className="text-2xl">🎙️</span>
-        <h1 className="font-bold text-lg tracking-tight">AI Meeting Assistant</h1>
-        <div className="ml-auto flex items-center gap-4">
-          <span className="text-xs text-white/50 font-mono">
-            Signed in as <span className="text-[#39FF14]">{user?.name}</span>
-          </span>
-          <button
-            onClick={logout}
-            className="text-xs bg-white/5 hover:bg-white/10 text-white/80 hover:text-white px-3 py-1.5 rounded border border-white/10 transition-colors"
-          >
-            Sign out
-          </button>
-        </div>
-      </header>
+      <MarketingNav />
 
-      {/* ── Main layout ────────────────────────────────────────────── */}
-      <div className="flex flex-col md:flex-row flex-1 overflow-hidden">
-
-        {/* Left sidebar — history */}
-        <aside className="flex flex-col w-full md:w-72 shrink-0 border-b md:border-b-0 md:border-r border-white/8 p-4 gap-4 overflow-y-auto max-h-64 md:max-h-none">
-          <p className="text-white/40 text-xs font-semibold uppercase tracking-wider px-1">
-            Past Meetings
-          </p>
-          <MeetingHistory
-            activeMeetingId={activeMeetingId}
-            onSelect={setActiveMeetingId}
-            onDelete={(id) => {
-              // If the deleted meeting is the one being viewed, clear the panel
-              if (activeMeetingId === id) setActiveMeetingId(null);
-            }}
-          />
-        </aside>
-
-        {/* Main content */}
-        <main className="flex-1 overflow-y-auto p-6 md:p-10">
-          <div className="max-w-2xl mx-auto flex flex-col gap-8">
-
-            {/* Upload section */}
-            <section>
-              <h2 className="text-white/50 text-xs font-semibold uppercase tracking-wider mb-4">
-                Upload Recording
-              </h2>
-              <AudioUpload onComplete={setActiveMeetingId} />
-            </section>
-
-            {/* Results section */}
-            {activeMeeting && (
-              <section>
-                <h2 className="text-white/50 text-xs font-semibold uppercase tracking-wider mb-4">
-                  Results
-                </h2>
-                <MeetingResults meeting={activeMeeting} />
-                {activeMeeting.status === MeetingStatus.Completed && (
-                  <ExtractedItemsReview meetingId={activeMeeting.id} />
-                )}
-              </section>
-            )}
+      <main className="flex-1">
+        <section className="max-w-6xl mx-auto px-6 py-20 md:py-28">
+          <div className="max-w-3xl">
+            <p className="text-[#39FF14] text-sm font-semibold uppercase tracking-widest mb-4">
+              AI-powered meeting intelligence
+            </p>
+            <h1 className="text-4xl md:text-6xl font-bold tracking-tight leading-tight mb-6">
+              Turn meetings into Jira-ready work items
+            </h1>
+            <p className="text-lg text-white/60 leading-relaxed mb-10">
+              Upload recordings, get transcripts and summaries, then review and
+              approve structured Jira drafts before they land in your backlog.
+            </p>
+            <div className="flex flex-wrap gap-4">
+              <Link
+                href="/register"
+                className="bg-[#39FF14] text-black font-semibold px-6 py-3 rounded-lg hover:bg-[#32e612] transition-colors"
+              >
+                Start free
+              </Link>
+              <Link
+                href="/features"
+                className="border border-white/15 text-white px-6 py-3 rounded-lg hover:bg-white/5 transition-colors"
+              >
+                See features
+              </Link>
+            </div>
           </div>
-        </main>
-      </div>
+        </section>
+
+        <section className="border-t border-white/8 bg-white/[0.02]">
+          <div className="max-w-6xl mx-auto px-6 py-16 grid md:grid-cols-3 gap-8">
+            {[
+              {
+                title: 'Transcribe & summarize',
+                body: 'Automatic transcription and AI summaries with key points and action items.',
+              },
+              {
+                title: 'Extract Jira drafts',
+                body: 'Headings, bullet lists, and tables formatted natively for Jira Cloud.',
+              },
+              {
+                title: 'Review before send',
+                body: 'Edit drafts, approve with one click, and create issues in your project.',
+              },
+            ].map((item) => (
+              <div
+                key={item.title}
+                className="rounded-2xl border border-white/10 bg-white/5 p-6"
+              >
+                <h2 className="font-semibold text-lg mb-2">{item.title}</h2>
+                <p className="text-sm text-white/55 leading-relaxed">{item.body}</p>
+              </div>
+            ))}
+          </div>
+        </section>
+      </main>
+
+      <MarketingFooter />
     </div>
   );
 }

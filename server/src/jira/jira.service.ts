@@ -2,8 +2,9 @@ import {
   Injectable,
   InternalServerErrorException,
   Logger,
+  Inject,
 } from '@nestjs/common';
-import { Inject } from '@nestjs/common';
+import { ConfigType } from '@nestjs/config';
 import { ExtractedItemType } from '../extracted-items/enums/extracted-item-type.enum';
 import { ExtractedItemPriority } from '../extracted-items/enums/extracted-item-priority.enum';
 import {
@@ -13,13 +14,14 @@ import {
   requireJiraApiGatewayUrl,
   requireJiraCredentials,
 } from '../common/config/jira.config';
-import { ConfigType } from '@nestjs/config';
 import { normalizeBaseUrl } from '../common/config/env.helpers';
+import { isValidAdfDocument } from '../common/jira-document/blocks-to-adf';
+import { JiraAdfDocument } from '../common/jira-document/jira-document.types';
 
 export interface JiraCreateIssueInput {
   type: ExtractedItemType;
   title: string;
-  description: string;
+  description: JiraAdfDocument;
   priority: ExtractedItemPriority;
 }
 
@@ -53,6 +55,7 @@ export class JiraService {
     if (!this.config.baseUrl) {
       return null;
     }
+
     return `${normalizeBaseUrl(this.config.baseUrl)}/browse/${issueKey}`;
   }
 
@@ -63,12 +66,13 @@ export class JiraService {
 
     const url = this.buildRestUrl('/rest/api/3/issue', cloudId);
     const auth = Buffer.from(`${email}:${apiKey}`).toString('base64');
+    const description = this.assertValidAdf(input.description);
 
     const body = {
       fields: {
         project: { key: projectKey },
         summary: input.title,
-        description: this.toAdfDocument(input.description),
+        description,
         issuetype: { name: this.mapIssueType(input.type) },
         priority: { name: this.mapPriority(input.priority) },
       },
@@ -104,6 +108,15 @@ export class JiraService {
     return { issueKey: data.key, issueId: data.id };
   }
 
+  assertValidAdf(description: JiraAdfDocument): JiraAdfDocument {
+    if (!isValidAdfDocument(description)) {
+      throw new InternalServerErrorException(
+        'Invalid Jira document format for issue description.',
+      );
+    }
+    return description;
+  }
+
   private buildRestUrl(path: string, cloudId: string): string {
     const normalizedPath = path.startsWith('/') ? path : `/${path}`;
     return `${requireJiraApiGatewayUrl(this.config)}/${cloudId}${normalizedPath}`;
@@ -126,26 +139,6 @@ export class JiraService {
       [ExtractedItemPriority.High]: 'High',
     };
     return priorityMap[priority];
-  }
-
-  private toAdfDocument(text: string): object {
-    const paragraphs = text
-      .split(/\n+/)
-      .map((line) => line.trim())
-      .filter(Boolean);
-
-    if (paragraphs.length === 0) {
-      paragraphs.push('');
-    }
-
-    return {
-      type: 'doc',
-      version: 1,
-      content: paragraphs.map((paragraph) => ({
-        type: 'paragraph',
-        content: [{ type: 'text', text: paragraph }],
-      })),
-    };
   }
 
   private extractErrorMessage(errorBody: string): string {

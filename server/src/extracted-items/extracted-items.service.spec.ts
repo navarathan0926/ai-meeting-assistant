@@ -8,11 +8,15 @@ import { ExtractedItemPriority } from './enums/extracted-item-priority.enum';
 import { ExtractedItemStatus } from './enums/extracted-item-status.enum';
 import { MeetingsService } from '../meetings/meetings.service';
 import { JiraService } from '../jira/jira.service';
+import { JiraSendService } from '../jira/jira-send.service';
 import {
   BadRequestException,
   ConflictException,
   NotFoundException,
 } from '@nestjs/common';
+import { blocksToAdf } from '../common/jira-document/blocks-to-adf';
+
+const sampleAdf = blocksToAdf([{ type: 'paragraph', text: 'Users cannot log in.' }]);
 
 function buildItem(overrides: Partial<ExtractedItem> = {}): ExtractedItem {
   const item = new ExtractedItem();
@@ -20,7 +24,7 @@ function buildItem(overrides: Partial<ExtractedItem> = {}): ExtractedItem {
   item.meetingId = 'meeting-uuid';
   item.type = ExtractedItemType.Task;
   item.title = 'Fix login bug';
-  item.description = 'Users cannot log in.';
+  item.description = sampleAdf;
   item.priority = ExtractedItemPriority.High;
   item.contextSnippet = 'Discussed at 10:05';
   item.status = ExtractedItemStatus.Draft;
@@ -35,6 +39,7 @@ describe('ExtractedItemsService', () => {
   let repo: jest.Mocked<Repository<ExtractedItem>>;
   let meetingsService: jest.Mocked<MeetingsService>;
   let jiraService: jest.Mocked<JiraService>;
+  let jiraSendService: jest.Mocked<JiraSendService>;
 
   beforeEach(async () => {
     const module: TestingModule = await Test.createTestingModule({
@@ -63,6 +68,12 @@ describe('ExtractedItemsService', () => {
             isConfigured: jest.fn().mockReturnValue(true),
           },
         },
+        {
+          provide: JiraSendService,
+          useValue: {
+            enqueueSend: jest.fn().mockResolvedValue(undefined),
+          },
+        },
       ],
     }).compile();
 
@@ -70,6 +81,7 @@ describe('ExtractedItemsService', () => {
     repo = module.get(getRepositoryToken(ExtractedItem));
     meetingsService = module.get(MeetingsService);
     jiraService = module.get(JiraService);
+    jiraSendService = module.get(JiraSendService);
   });
 
   describe('findByMeeting', () => {
@@ -138,38 +150,30 @@ describe('ExtractedItemsService', () => {
   });
 
   describe('approve', () => {
-    it('should create a Jira issue and mark item as sent', async () => {
+    it('should queue Jira send and return approved item', async () => {
       repo.findOne
         .mockResolvedValueOnce(buildItem())
         .mockResolvedValueOnce(buildItem({ status: ExtractedItemStatus.Approved }));
       repo.update.mockResolvedValue({ affected: 1, raw: [], generatedMaps: [] });
-      jiraService.createIssue.mockResolvedValue({
-        issueKey: 'PROJ-42',
-        issueId: '10001',
-      });
-      jiraService.getIssueBrowseUrl.mockReturnValue(
-        'https://example.atlassian.net/browse/PROJ-42',
-      );
 
       const result = await service.approve('user-1', 'item-uuid');
 
-      expect(jiraService.createIssue).toHaveBeenCalled();
-      expect(result.status).toBe(ExtractedItemStatus.Sent);
-      expect(result.jiraIssueKey).toBe('PROJ-42');
+      expect(jiraSendService.enqueueSend).toHaveBeenCalledWith('item-uuid');
+      expect(result.status).toBe(ExtractedItemStatus.Approved);
     });
 
-    it('should revert to draft and return jiraError when Jira fails', async () => {
+    it('should revert to draft and return jiraError when queueing fails', async () => {
       const approvedItem = buildItem({ status: ExtractedItemStatus.Approved });
       repo.findOne
         .mockResolvedValueOnce(buildItem())
         .mockResolvedValueOnce(approvedItem);
       repo.update.mockResolvedValue({ affected: 1, raw: [], generatedMaps: [] });
-      jiraService.createIssue.mockRejectedValue(new Error('Jira unavailable'));
+      jiraSendService.enqueueSend.mockRejectedValue(new Error('Queue unavailable'));
 
       const result = await service.approve('user-1', 'item-uuid');
 
       expect(result.status).toBe(ExtractedItemStatus.Draft);
-      expect(result.jiraError).toContain('Jira unavailable');
+      expect(result.jiraError).toContain('Queue unavailable');
     });
 
     it('should throw conflict when item is already being sent', async () => {

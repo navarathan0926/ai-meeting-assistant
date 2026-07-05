@@ -11,6 +11,7 @@ import { AuthController } from './auth.controller';
 import { User } from './entities/user.entity';
 import { JwtStrategy } from './strategies/jwt.strategy';
 import { GoogleStrategy } from './strategies/google.strategy';
+import { GoogleOauthGuard } from './guards/google-oauth.guard';
 import { AuthGuard } from '../common/guards/auth.guard';
 import { authConfiguration } from '../common/config/auth.config';
 
@@ -34,6 +35,7 @@ import { authConfiguration } from '../common/config/auth.config';
     AuthOauthCodeService,
     JwtStrategy,
     GoogleStrategy,
+    GoogleOauthGuard,
     AuthGuard,
   ],
   controllers: [AuthController],

@@ -17,6 +17,7 @@ import {
   ItemExtractionOutput,
   RawExtractedItem,
 } from './item-extraction.schema';
+import { rawBlocksToAdf } from '../common/jira-document/merge-jira-documents';
 import {
   buildItemExtractionUserPrompt,
   ITEM_EXTRACTION_SYSTEM_PROMPT,
@@ -116,7 +117,7 @@ export class ItemExtractionProcessor extends WorkerHost {
         meetingId,
         type: this.parseType(item.type),
         title: item.title.trim(),
-        description: item.description.trim(),
+        description: rawBlocksToAdf(item.description_blocks),
         priority: this.parsePriority(item.priority),
         contextSnippet: item.context_snippet?.trim() || null,
         status: ExtractedItemStatus.Draft,

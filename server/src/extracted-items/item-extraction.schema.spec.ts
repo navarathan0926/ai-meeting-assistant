@@ -1,14 +1,31 @@
 import {
   consolidateExtractedItems,
   deduplicateItems,
+  RawDescriptionBlock,
   RawExtractedItem,
 } from './item-extraction.schema';
+import { blocksToPlainText, rawBlocksToDocumentBlocks } from '../common/jira-document/blocks-to-adf';
+
+function paragraphBlock(text: string): RawDescriptionBlock {
+  return {
+    type: 'paragraph',
+    level: 0,
+    text,
+    items: [],
+    headers: [],
+    rows: [],
+  };
+}
+
+function itemDescText(item: RawExtractedItem): string {
+  return blocksToPlainText(rawBlocksToDocumentBlocks(item.description_blocks));
+}
 
 function buildItem(overrides: Partial<RawExtractedItem> = {}): RawExtractedItem {
   return {
     type: 'task',
     title: 'Fix login bug',
-    description: 'Users cannot log in on mobile.',
+    description_blocks: [paragraphBlock('Users cannot log in on mobile.')],
     priority: 'high',
     context_snippet: 'We noticed login fails on iOS.',
     scope: 'mobile-login-bug',
@@ -35,12 +52,12 @@ describe('deduplicateItems', () => {
       buildItem({
         title: 'Fix login bug',
         scope: 'mobile-login-bug',
-        description: 'Short description',
+        description_blocks: [paragraphBlock('Short description')],
       }),
       buildItem({
         title: 'Submit login fix',
         scope: 'mobile-login-bug',
-        description: 'Deploy patch to production',
+        description_blocks: [paragraphBlock('Deploy patch to production')],
         type: 'task',
       }),
     ];
@@ -52,12 +69,14 @@ describe('deduplicateItems', () => {
     const items = [
       buildItem({
         title: 'Fix login bug',
-        description: 'Short description',
+        description_blocks: [paragraphBlock('Short description')],
         priority: 'low',
       }),
       buildItem({
         title: '  fix login bug ',
-        description: 'Longer description with more context',
+        description_blocks: [
+          paragraphBlock('Longer description with more context'),
+        ],
         priority: 'high',
         context_snippet:
           'Extended snippet from the transcript with more surrounding context.',
@@ -67,7 +86,7 @@ describe('deduplicateItems', () => {
     const result = deduplicateItems(items);
 
     expect(result).toHaveLength(1);
-    expect(result[0].description).toContain('Longer description with more context');
+    expect(itemDescText(result[0])).toContain('Longer description with more context');
     expect(result[0].priority).toBe('high');
   });
 
@@ -88,7 +107,9 @@ describe('consolidateExtractedItems', () => {
         type: 'bug',
         title: 'Production checkout failure on mobile Safari',
         scope: 'checkout-mobile-bug',
-        description: 'Users cannot complete checkout on iOS Safari.',
+        description_blocks: [
+          paragraphBlock('Users cannot complete checkout on iOS Safari.'),
+        ],
         context_snippet:
           'Production bug: checkout fails on mobile Safari after the latest release.',
       }),
@@ -96,7 +117,9 @@ describe('consolidateExtractedItems', () => {
         type: 'task',
         title: 'Submit fix for checkout bug',
         scope: 'checkout-fix-submit',
-        description: 'Submit the patch for review and deploy.',
+        description_blocks: [
+          paragraphBlock('Submit the patch for review and deploy.'),
+        ],
         context_snippet:
           'Production bug: checkout fails on mobile Safari after the latest release.',
       }),
@@ -104,7 +127,9 @@ describe('consolidateExtractedItems', () => {
         type: 'task',
         title: 'Run regression testing for checkout',
         scope: 'checkout-regression',
-        description: 'Verify checkout on iOS and Android after the fix.',
+        description_blocks: [
+          paragraphBlock('Verify checkout on iOS and Android after the fix.'),
+        ],
         context_snippet:
           'Production bug: checkout fails on mobile Safari after the latest release.',
       }),
@@ -115,7 +140,7 @@ describe('consolidateExtractedItems', () => {
     expect(result).toHaveLength(1);
     expect(result[0].type).toBe('bug');
     expect(result[0].title).toContain('checkout');
-    expect(result[0].description).toMatch(/regression|submit|Sub-steps/i);
+    expect(itemDescText(result[0])).toMatch(/regression|submit|Sub-steps/i);
   });
 
   it('should merge feature implementation subtasks into one story card', () => {
@@ -124,28 +149,36 @@ describe('consolidateExtractedItems', () => {
         type: 'story',
         title: 'Payment API integration',
         scope: 'payment-api',
-        description: 'Add payment endpoints for checkout flow.',
+        description_blocks: [
+          paragraphBlock('Add payment endpoints for checkout flow.'),
+        ],
         context_snippet: 'We need payment API endpoints for the new checkout.',
       }),
       buildItem({
         type: 'task',
         title: 'Create payment validation endpoint',
         scope: 'payment-validation-endpoint',
-        description: 'Build endpoint to validate card details.',
+        description_blocks: [
+          paragraphBlock('Build endpoint to validate card details.'),
+        ],
         context_snippet: 'We need payment API endpoints for the new checkout.',
       }),
       buildItem({
         type: 'task',
         title: 'Prepare payment API test cases',
         scope: 'payment-api-tests',
-        description: 'Write integration tests for payment endpoints.',
+        description_blocks: [
+          paragraphBlock('Write integration tests for payment endpoints.'),
+        ],
         context_snippet: 'We need payment API endpoints for the new checkout.',
       }),
       buildItem({
         type: 'task',
         title: 'Define payment story acceptance criteria',
         scope: 'payment-story-definition',
-        description: 'Document acceptance criteria for payment flow.',
+        description_blocks: [
+          paragraphBlock('Document acceptance criteria for payment flow.'),
+        ],
         context_snippet: 'We need payment API endpoints for the new checkout.',
       }),
     ];
@@ -154,7 +187,7 @@ describe('consolidateExtractedItems', () => {
 
     expect(result).toHaveLength(1);
     expect(['story', 'feature']).toContain(result[0].type);
-    expect(result[0].description).toMatch(/Sub-steps|validation|test cases/i);
+    expect(itemDescText(result[0])).toMatch(/Sub-steps|validation|test cases/i);
   });
 
   it('should keep unrelated topics as separate cards', () => {
@@ -162,13 +195,17 @@ describe('consolidateExtractedItems', () => {
       buildItem({
         title: 'Fix login bug on mobile',
         scope: 'mobile-login-bug',
-        description: 'Users cannot log in on iOS devices.',
+        description_blocks: [
+          paragraphBlock('Users cannot log in on iOS devices.'),
+        ],
         context_snippet: 'Login fails on iOS devices.',
       }),
       buildItem({
         title: 'Migrate billing database',
         scope: 'billing-db-migration',
-        description: 'Move billing data to the new database cluster.',
+        description_blocks: [
+          paragraphBlock('Move billing data to the new database cluster.'),
+        ],
         context_snippet: 'We need to migrate billing data to the new cluster.',
       }),
     ];

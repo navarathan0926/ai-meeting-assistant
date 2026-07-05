@@ -5,8 +5,7 @@ export interface AuthUser {
   provider: string;
 }
 
-export interface AuthResult {
-  accessToken: string;
+export interface AuthSession {
   user: AuthUser;
 }
 

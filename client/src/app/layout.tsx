@@ -1,8 +1,13 @@
 import type { Metadata } from 'next';
-import { QueryProvider } from '@/providers/QueryProvider';
+import { Inter } from 'next/font/google';
 import { ToastProvider } from '@/providers/ToastProvider';
-import { AuthProvider } from '@/providers/AuthProvider';
 import './globals.css';
+
+const inter = Inter({
+  subsets: ['latin'],
+  variable: '--font-geist-sans',
+  display: 'swap',
+});
 
 export const metadata: Metadata = {
   title: 'AI Meeting Assistant',
@@ -16,27 +21,10 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html
-      lang="en"
-      className="h-full antialiased"
-      style={{
-        fontFamily: 'Geist, system-ui, -apple-system, sans-serif',
-        // Support custom variables in css
-        ['--font-geist-sans' as any]: 'Geist, system-ui, sans-serif',
-        ['--font-geist-mono' as any]: 'Geist Mono, monospace',
-      }}
-    >
-      <body className="min-h-full flex flex-col">
-        {/* QueryProvider must wrap everything that uses React Query hooks */}
-        <QueryProvider>
-          <AuthProvider>
-            <ToastProvider>
-              {children}
-            </ToastProvider>
-          </AuthProvider>
-        </QueryProvider>
+    <html lang="en" className={`${inter.variable} h-full antialiased`}>
+      <body className="min-h-full flex flex-col font-sans">
+        <ToastProvider>{children}</ToastProvider>
       </body>
     </html>
   );
 }
-

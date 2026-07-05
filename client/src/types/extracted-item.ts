@@ -1,3 +1,11 @@
+import {
+  emptyJiraAdfDocument,
+  isJiraAdfDocument,
+  JiraAdfDocument,
+} from '@/lib/jira-document/types';
+
+export type { JiraAdfDocument };
+
 // ── Enums ────────────────────────────────────────────────────────────────────
 
 export enum ExtractedItemType {
@@ -27,12 +35,13 @@ export interface ExtractedItem {
   meetingId: string;
   type: ExtractedItemType;
   title: string;
-  description: string;
+  description: JiraAdfDocument;
   priority: ExtractedItemPriority;
   contextSnippet: string | null;
   status: ExtractedItemStatus;
   jiraIssueKey: string | null;
   jiraIssueUrl: string | null;
+  jiraSyncError?: string | null;
   createdAt: string;
   updatedAt: string;
 }
@@ -44,6 +53,24 @@ export interface ApproveExtractedItemResult extends ExtractedItem {
 export interface UpdateExtractedItemPayload {
   type?: ExtractedItemType;
   title?: string;
-  description?: string;
+  description?: JiraAdfDocument;
   priority?: ExtractedItemPriority;
+}
+
+export function normalizeExtractedItemDescription(
+  description: unknown,
+): JiraAdfDocument {
+  if (isJiraAdfDocument(description)) {
+    return description;
+  }
+  if (typeof description === 'string' && description.trim()) {
+    return {
+      type: 'doc',
+      version: 1,
+      content: [
+        { type: 'paragraph', content: [{ type: 'text', text: description }] },
+      ],
+    };
+  }
+  return emptyJiraAdfDocument();
 }

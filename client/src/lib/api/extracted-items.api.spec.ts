@@ -9,7 +9,13 @@ import {
   ExtractedItemType,
 } from '@/types/extracted-item';
 
+import { blocksToAdf } from '@/lib/jira-document/adf-utils';
+
 const mock = new MockAdapter(apiClient);
+
+const sampleDescription = blocksToAdf([
+  { type: 'paragraph', text: 'Users cannot log in on mobile.' },
+]);
 
 afterEach(() => {
   mock.reset();
@@ -24,7 +30,7 @@ function buildItem(overrides: Partial<ExtractedItem> = {}): ExtractedItem {
     meetingId: MEETING_ID,
     type: ExtractedItemType.Task,
     title: 'Fix login bug',
-    description: 'Users cannot log in on mobile.',
+    description: sampleDescription,
     priority: ExtractedItemPriority.High,
     contextSnippet: 'Discussed at 10:05',
     status: ExtractedItemStatus.Draft,
@@ -45,7 +51,7 @@ describe('extractedItemsApi', () => {
     it('should GET extracted items for a meeting', async () => {
       const items = [buildItem()];
       mock
-        .onGet(`/meetings/${MEETING_ID}/extracted-items`)
+        .onGet(`/extracted-items/meeting/${MEETING_ID}`)
         .reply(200, wrapInApiResponse(items));
 
       const result = await extractedItemsApi.listByMeeting(MEETING_ID);

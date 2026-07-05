@@ -194,13 +194,25 @@ title
   Good: "Mobile login fails on iOS Safari"
   Bad:  "Run regression tests"
 
-description
-  Use Markdown. Include only information supported by the meeting.
-  Structure naturally — typical sections:
-  - Context
-  - Scope
-  - Acceptance Criteria
-  - Sub-steps (implementation, testing, validation steps discussed)
+description_blocks
+  Structured Jira document blocks (NOT Markdown). Include only information supported by the meeting.
+  Use these block types:
+  - heading (level 2 or 3) for section titles: Context, Scope, Acceptance Criteria, Sub-steps
+  - paragraph for plain text sections
+  - bulletList for criteria, steps, and unordered items
+  - orderedList when sequence matters
+  - table when the meeting discusses tabular data (field mappings, test matrix, comparisons)
+
+  Example structure:
+  [
+    { "type": "heading", "level": 2, "text": "Context", "items": [], "headers": [], "rows": [] },
+    { "type": "paragraph", "level": 0, "text": "...", "items": [], "headers": [], "rows": [] },
+    { "type": "heading", "level": 3, "text": "Acceptance Criteria", "items": [], "headers": [], "rows": [] },
+    { "type": "bulletList", "level": 0, "text": "", "items": ["Criterion one"], "headers": [], "rows": [] }
+  ]
+
+  Every block must include all fields: type, level, text, items, headers, rows.
+  Use empty strings/arrays for unused fields.
 
 scope
   A stable kebab-case identifier for the work theme (e.g. "mobile-login-bug", "payment-api").

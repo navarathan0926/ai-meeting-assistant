@@ -51,9 +51,15 @@ export class TranscriptionsService {
         response_format: 'verbose_json',
       });
 
+      const durationSeconds =
+        'duration' in whisperResponse &&
+        typeof whisperResponse.duration === 'number'
+          ? whisperResponse.duration
+          : null;
+
       const transcription = this.transcriptionRepository.create({
         text: whisperResponse.text,
-        durationSeconds: (whisperResponse as any).duration ?? null,
+        durationSeconds,
       });
 
       const saved = await this.transcriptionRepository.save(transcription);

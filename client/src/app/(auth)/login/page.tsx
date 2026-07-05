@@ -57,8 +57,8 @@ function LoginForm() {
     setIsExchangingCode(true);
     exchangeOAuthCode(code)
       .then((data) => {
-        login(data.accessToken, data.user);
-        router.replace('/');
+        login(data.user);
+        router.replace('/dashboard');
       })
       .catch(() => {
         setOauthError('Google sign-in failed. Please try again.');
@@ -71,7 +71,7 @@ function LoginForm() {
 
   useEffect(() => {
     if (!isLoading && isAuthenticated) {
-      router.replace('/');
+      router.replace('/dashboard');
     }
   }, [isAuthenticated, isLoading, router]);
 
@@ -148,12 +148,7 @@ function LoginForm() {
         </div>
 
         <div className="form-field">
-          <div className="form-label-row">
-            <label htmlFor="login-password" className="form-label">Password</label>
-            <button type="button" className="forgot-link" tabIndex={-1}>
-              Forgot password?
-            </button>
-          </div>
+          <label htmlFor="login-password" className="form-label">Password</label>
           <div className="input-wrapper">
             <input
               id="login-password"

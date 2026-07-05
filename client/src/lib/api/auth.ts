@@ -1,6 +1,6 @@
 import apiClient from '@/lib/axios';
 import {
-  AuthResult,
+  AuthSession,
   RegisterPayload,
   LoginPayload,
 } from '@/types/auth';
@@ -11,24 +11,24 @@ interface ApiEnvelope<T> {
   timestamp: string;
 }
 
-export async function registerUser(payload: RegisterPayload): Promise<AuthResult> {
-  const res = await apiClient.post<ApiEnvelope<AuthResult>>(
+export async function registerUser(payload: RegisterPayload): Promise<AuthSession> {
+  const res = await apiClient.post<ApiEnvelope<AuthSession>>(
     '/auth/register',
     payload,
   );
   return res.data.data;
 }
 
-export async function loginUser(payload: LoginPayload): Promise<AuthResult> {
-  const res = await apiClient.post<ApiEnvelope<AuthResult>>(
+export async function loginUser(payload: LoginPayload): Promise<AuthSession> {
+  const res = await apiClient.post<ApiEnvelope<AuthSession>>(
     '/auth/login',
     payload,
   );
   return res.data.data;
 }
 
-export async function exchangeOAuthCode(code: string): Promise<AuthResult> {
-  const res = await apiClient.post<ApiEnvelope<AuthResult>>(
+export async function exchangeOAuthCode(code: string): Promise<AuthSession> {
+  const res = await apiClient.post<ApiEnvelope<AuthSession>>(
     '/auth/oauth/exchange',
     { code },
   );

@@ -1,11 +1,13 @@
 'use client';
 
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useState } from 'react';
+import dynamic from 'next/dynamic';
 import {
   ExtractedItem,
   ExtractedItemPriority,
   ExtractedItemStatus,
   ExtractedItemType,
+  normalizeExtractedItemDescription,
   UpdateExtractedItemPayload,
 } from '@/types/extracted-item';
 import {
@@ -15,6 +17,21 @@ import {
   useUpdateExtractedItem,
 } from '@/hooks/useExtractedItems';
 import { ConfirmationModal } from '@/components/common/ConfirmationModal';
+import { JiraDocumentRenderer } from '@/lib/jira-document/JiraDocumentRenderer';
+import { JiraAdfDocument } from '@/lib/jira-document/types';
+
+const RichDescriptionEditor = dynamic(
+  () =>
+    import('@/lib/jira-document/RichDescriptionEditor').then(
+      (mod) => mod.RichDescriptionEditor,
+    ),
+  {
+    ssr: false,
+    loading: () => (
+      <p className="text-sm text-white/50 py-4">Loading editor…</p>
+    ),
+  },
+);
 
 interface ExtractedItemsReviewProps {
   meetingId: string;
@@ -75,19 +92,21 @@ function ExtractedItemCard({
   const [draft, setDraft] = useState({
     type: item.type,
     title: item.title,
-    description: item.description,
+    description: normalizeExtractedItemDescription(item.description),
     priority: item.priority,
   });
+  const [isEditingDescription, setIsEditingDescription] = useState(false);
   const [pendingAction, setPendingAction] = useState<PendingAction | null>(null);
 
   useEffect(() => {
     setDraft({
       type: item.type,
       title: item.title,
-      description: item.description,
+      description: normalizeExtractedItemDescription(item.description),
       priority: item.priority,
     });
-  }, [item.type, item.title, item.description, item.priority, item.updatedAt]);
+    setIsEditingDescription(false);
+  }, [item.id, item.updatedAt, item.type, item.title, item.priority]);
 
   const isEditable = item.status === ExtractedItemStatus.Draft;
   const isBusy =
@@ -99,7 +118,6 @@ function ExtractedItemCard({
     const payload: UpdateExtractedItemPayload = {};
     if (draft.type !== item.type) payload.type = draft.type;
     if (draft.title !== item.title) payload.title = draft.title;
-    if (draft.description !== item.description) payload.description = draft.description;
     if (draft.priority !== item.priority) payload.priority = draft.priority;
 
     if (Object.keys(payload).length === 0) {
@@ -107,6 +125,29 @@ function ExtractedItemCard({
     }
 
     updateMutation.mutate({ id: item.id, payload });
+  };
+
+  const handleDescriptionSave = (description: JiraAdfDocument) => {
+    updateMutation.mutate(
+      { id: item.id, payload: { description } },
+      {
+        onSuccess: (updatedItem) => {
+          const normalized = normalizeExtractedItemDescription(
+            updatedItem.description,
+          );
+          setDraft((prev) => ({ ...prev, description: normalized }));
+          setIsEditingDescription(false);
+        },
+      },
+    );
+  };
+
+  const handleDescriptionCancel = () => {
+    setDraft((prev) => ({
+      ...prev,
+      description: normalizeExtractedItemDescription(item.description),
+    }));
+    setIsEditingDescription(false);
   };
 
   const handleConfirmAction = () => {
@@ -170,6 +211,12 @@ function ExtractedItemCard({
         )}
       </div>
 
+      {item.jiraSyncError && item.status === ExtractedItemStatus.Draft && (
+        <p className="mb-3 text-xs text-red-400/90 rounded-lg border border-red-500/30 bg-red-900/20 px-3 py-2">
+          Last Jira sync failed: {item.jiraSyncError}
+        </p>
+      )}
+
       <div className="grid gap-3">
         <label className="flex flex-col gap-1 text-xs text-white/50">
           Type
@@ -204,18 +251,40 @@ function ExtractedItemCard({
           />
         </label>
 
-        <label className="flex flex-col gap-1 text-xs text-white/50">
-          Description
-          <textarea
-            value={draft.description}
-            disabled={!isEditable || isBusy}
-            rows={3}
-            onChange={(e) =>
-              setDraft((prev) => ({ ...prev, description: e.target.value }))
-            }
-            className="rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-sm text-white disabled:opacity-50 resize-y"
-          />
-        </label>
+        <div className="flex flex-col gap-2">
+          <div className="flex items-center justify-between">
+            <span className="text-xs text-white/50">Description</span>
+            {isEditable && (
+              <button
+                type="button"
+                disabled={isBusy}
+                onClick={() => {
+                  if (isEditingDescription) {
+                    handleDescriptionCancel();
+                    return;
+                  }
+                  setIsEditingDescription(true);
+                }}
+                className="text-xs text-indigo-300 hover:text-indigo-200 disabled:opacity-50"
+              >
+                {isEditingDescription ? 'Preview' : 'Edit'}
+              </button>
+            )}
+          </div>
+
+          {isEditable && isEditingDescription ? (
+            <RichDescriptionEditor
+              document={draft.description}
+              disabled={isBusy}
+              onSave={handleDescriptionSave}
+              onCancel={handleDescriptionCancel}
+            />
+          ) : (
+            <div className="rounded-lg border border-white/10 bg-white/5 px-3 py-3">
+              <JiraDocumentRenderer document={draft.description} />
+            </div>
+          )}
+        </div>
 
         <label className="flex flex-col gap-1 text-xs text-white/50">
           Priority

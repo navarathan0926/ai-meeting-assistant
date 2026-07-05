@@ -17,17 +17,17 @@ import { CurrentUser } from '../common/decorators/current-user.decorator';
 import { User } from '../auth/entities/user.entity';
 import { MeetingsService } from './meetings.service';
 import { MeetingResponse } from './interfaces/meeting-response.interface';
-import { ExtractedItemsService } from '../extracted-items/extracted-items.service';
-import { ExtractedItemResponse } from '../extracted-items/interfaces/extracted-item-response.interface';
+import {
+  buildPaginatedResponse,
+  PaginatedResponse,
+  PaginationQueryDto,
+} from '../common/dto/pagination-query.dto';
 import type { Express } from 'express';
 
 @Auth()
 @Controller('meetings')
 export class MeetingsController {
-  constructor(
-    private readonly meetingsService: MeetingsService,
-    private readonly extractedItemsService: ExtractedItemsService,
-  ) {}
+  constructor(private readonly meetingsService: MeetingsService) {}
 
   @Post('upload')
   @HttpCode(HttpStatus.ACCEPTED)
@@ -47,17 +47,17 @@ export class MeetingsController {
   @Get()
   async findAll(
     @CurrentUser() user: User,
-    @Query('search') search?: string,
-  ): Promise<MeetingResponse[]> {
-    return this.meetingsService.findAll(user.id, search);
-  }
+    @Query() query: PaginationQueryDto,
+  ): Promise<PaginatedResponse<MeetingResponse>> {
+    const page = query.page ?? 1;
+    const limit = query.limit ?? 20;
+    const { items, total } = await this.meetingsService.findAll(user.id, {
+      page,
+      limit,
+      search: query.search,
+    });
 
-  @Get(':id/extracted-items')
-  async listExtractedItems(
-    @CurrentUser() user: User,
-    @Param('id', ParseUUIDPipe) id: string,
-  ): Promise<ExtractedItemResponse[]> {
-    return this.extractedItemsService.findByMeeting(user.id, id);
+    return buildPaginatedResponse(items, total, page, limit);
   }
 
   @Get(':id')

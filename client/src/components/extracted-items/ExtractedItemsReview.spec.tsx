@@ -7,6 +7,40 @@ import {
   ExtractedItemStatus,
   ExtractedItemType,
 } from '@/types/extracted-item';
+import { blocksToAdf } from '@/lib/jira-document/adf-utils';
+
+jest.mock('next/dynamic', () => {
+  return () => {
+    const { RichDescriptionEditor } = jest.requireMock(
+      '@/lib/jira-document/RichDescriptionEditor',
+    );
+    return RichDescriptionEditor;
+  };
+});
+
+jest.mock('@/lib/jira-document/RichDescriptionEditor', () => ({
+  RichDescriptionEditor: ({
+    onSave,
+    onCancel,
+  }: {
+    onSave: (document: ReturnType<typeof blocksToAdf>) => void;
+    onCancel: () => void;
+  }) => (
+    <div data-testid="rich-description-editor">
+      <button
+        type="button"
+        onClick={() =>
+          onSave(blocksToAdf([{ type: 'paragraph', text: 'Updated description' }]))
+        }
+      >
+        Save Changes
+      </button>
+      <button type="button" onClick={onCancel}>
+        Cancel
+      </button>
+    </div>
+  ),
+}));
 
 jest.mock('@/hooks/useExtractedItems', () => ({
   useExtractedItems: jest.fn(),
@@ -28,11 +62,18 @@ import {
   useExtractedItems,
   useApproveExtractedItem,
   useRejectExtractedItem,
+  useUpdateExtractedItem,
 } from '@/hooks/useExtractedItems';
 
 const mockedUseExtractedItems = useExtractedItems as jest.Mock;
 const mockedUseApprove = useApproveExtractedItem as jest.Mock;
 const mockedUseReject = useRejectExtractedItem as jest.Mock;
+const mockedUseUpdate = useUpdateExtractedItem as jest.Mock;
+
+const sampleDescription = blocksToAdf([
+  { type: 'heading', level: 2, text: 'Context' },
+  { type: 'paragraph', text: 'Users cannot log in.' },
+]);
 
 function renderWithQuery(ui: React.ReactElement) {
   const client = new QueryClient({
@@ -74,7 +115,7 @@ describe('ExtractedItemsReview', () => {
     ).toBeInTheDocument();
   });
 
-  it('should render draft items with edit controls', () => {
+  it('should render draft items with formatted description', () => {
     mockedUseExtractedItems.mockReturnValue({
       data: [
         {
@@ -82,7 +123,7 @@ describe('ExtractedItemsReview', () => {
           meetingId: 'meeting-1',
           type: ExtractedItemType.Bug,
           title: 'Fix login bug',
-          description: 'Users cannot log in.',
+          description: sampleDescription,
           priority: ExtractedItemPriority.High,
           contextSnippet: 'Discussed at 10:05',
           status: ExtractedItemStatus.Draft,
@@ -99,6 +140,9 @@ describe('ExtractedItemsReview', () => {
     renderWithQuery(<ExtractedItemsReview meetingId="meeting-1" />);
 
     expect(screen.getByDisplayValue('Fix login bug')).toBeInTheDocument();
+    expect(screen.getByText('Context')).toBeInTheDocument();
+    expect(screen.getByText('Users cannot log in.')).toBeInTheDocument();
+    expect(screen.queryByText(/\*\*/)).not.toBeInTheDocument();
     expect(screen.getByText(/discussed at 10:05/i)).toBeInTheDocument();
     expect(
       screen.getByRole('button', { name: /approve & send to jira/i }),
@@ -113,7 +157,7 @@ describe('ExtractedItemsReview', () => {
           meetingId: 'meeting-1',
           type: ExtractedItemType.Task,
           title: 'Ship feature',
-          description: 'Done',
+          description: blocksToAdf([{ type: 'paragraph', text: 'Done' }]),
           priority: ExtractedItemPriority.Medium,
           contextSnippet: null,
           status: ExtractedItemStatus.Sent,
@@ -150,7 +194,7 @@ describe('ExtractedItemsReview', () => {
           meetingId: 'meeting-1',
           type: ExtractedItemType.Bug,
           title: 'Fix login bug',
-          description: 'Users cannot log in.',
+          description: sampleDescription,
           priority: ExtractedItemPriority.High,
           contextSnippet: null,
           status: ExtractedItemStatus.Draft,
@@ -194,7 +238,7 @@ describe('ExtractedItemsReview', () => {
           meetingId: 'meeting-1',
           type: ExtractedItemType.Bug,
           title: 'Fix login bug',
-          description: 'Users cannot log in.',
+          description: sampleDescription,
           priority: ExtractedItemPriority.High,
           contextSnippet: null,
           status: ExtractedItemStatus.Draft,
@@ -220,5 +264,91 @@ describe('ExtractedItemsReview', () => {
     expect(
       screen.queryByRole('heading', { name: 'Reject item' }),
     ).not.toBeInTheDocument();
+  });
+
+  it('should open rich description editor and save description only', () => {
+    const updateMutate = jest.fn();
+    mockedUseUpdate.mockReturnValue({
+      mutate: updateMutate,
+      isPending: false,
+    });
+
+    mockedUseExtractedItems.mockReturnValue({
+      data: [
+        {
+          id: 'item-1',
+          meetingId: 'meeting-1',
+          type: ExtractedItemType.Bug,
+          title: 'Fix login bug',
+          description: sampleDescription,
+          priority: ExtractedItemPriority.High,
+          contextSnippet: null,
+          status: ExtractedItemStatus.Draft,
+          jiraIssueKey: null,
+          jiraIssueUrl: null,
+          createdAt: '2024-01-01T00:00:00.000Z',
+          updatedAt: '2024-01-01T00:00:00.000Z',
+        },
+      ],
+      isLoading: false,
+      isFetching: false,
+    });
+
+    renderWithQuery(<ExtractedItemsReview meetingId="meeting-1" />);
+
+    fireEvent.click(screen.getByRole('button', { name: /^edit$/i }));
+    expect(screen.getByRole('button', { name: 'Save Changes' })).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('button', { name: 'Save Changes' }));
+
+    expect(updateMutate).toHaveBeenCalledWith(
+      {
+        id: 'item-1',
+        payload: {
+          description: expect.objectContaining({
+            type: 'doc',
+            version: 1,
+          }),
+        },
+      },
+      expect.objectContaining({ onSuccess: expect.any(Function) }),
+    );
+  });
+
+  it('should cancel description edits when preview is clicked', () => {
+    mockedUseUpdate.mockReturnValue({
+      mutate: jest.fn(),
+      isPending: false,
+    });
+
+    mockedUseExtractedItems.mockReturnValue({
+      data: [
+        {
+          id: 'item-1',
+          meetingId: 'meeting-1',
+          type: ExtractedItemType.Bug,
+          title: 'Fix login bug',
+          description: sampleDescription,
+          priority: ExtractedItemPriority.High,
+          contextSnippet: null,
+          status: ExtractedItemStatus.Draft,
+          jiraIssueKey: null,
+          jiraIssueUrl: null,
+          createdAt: '2024-01-01T00:00:00.000Z',
+          updatedAt: '2024-01-01T00:00:00.000Z',
+        },
+      ],
+      isLoading: false,
+      isFetching: false,
+    });
+
+    renderWithQuery(<ExtractedItemsReview meetingId="meeting-1" />);
+
+    fireEvent.click(screen.getByRole('button', { name: /^edit$/i }));
+    expect(screen.getByRole('button', { name: 'Save Changes' })).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('button', { name: /^preview$/i }));
+    expect(screen.queryByRole('button', { name: 'Save Changes' })).not.toBeInTheDocument();
+    expect(screen.getByText('Context')).toBeInTheDocument();
   });
 });

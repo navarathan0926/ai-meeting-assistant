@@ -7,14 +7,10 @@ import {
   Min,
   validateSync,
 } from 'class-validator';
-import { EnvKey } from './env.keys';
+import { EnvKey, EnvKeyName } from './env.keys';
 
 const NODE_ENV_VALUES = ['development', 'production', 'test'] as const;
 
-/**
- * Validates environment variable shapes at startup.
- * Does not require optional integrations (Jira, Google OAuth) to be present.
- */
 class EnvironmentVariables {
   @IsOptional()
   @IsIn(NODE_ENV_VALUES)
@@ -75,8 +71,54 @@ class EnvironmentVariables {
   @IsOptional()
   @IsString()
   [EnvKey.RedisUrl]?: string;
+
+  @IsOptional()
+  @IsString()
+  [EnvKey.ClientUrl]?: string;
+
+  @IsOptional()
+  @IsString()
+  [EnvKey.FrontendUrl]?: string;
 }
 
+const PRODUCTION_REQUIRED_KEYS: EnvKeyName[] = [
+  EnvKey.DbHost,
+  EnvKey.DbUsername,
+  EnvKey.DbPassword,
+  EnvKey.DbName,
+  EnvKey.OpenAiApiKey,
+  EnvKey.OpenAiGptModel,
+  EnvKey.OpenAiWhisperModel,
+  EnvKey.OpenAiExtractionModel,
+  EnvKey.JwtSecret,
+  EnvKey.RedisUrl,
+  EnvKey.ClientUrl,
+];
+
+function validateProductionRequired(config: Record<string, unknown>): void {
+  const nodeEnv = config[EnvKey.NodeEnv] ?? 'development';
+  if (nodeEnv !== 'production') {
+    return;
+  }
+
+  const missing = PRODUCTION_REQUIRED_KEYS.filter((key) => {
+    const value = config[key];
+    return value === undefined || value === null || value === '';
+  });
+
+  if (missing.length > 0) {
+    throw new Error(
+      `Environment validation failed (production):\n${missing
+        .map((key) => `  - Missing required variable: ${key}`)
+        .join('\n')}`,
+    );
+  }
+}
+
+/**
+ * Validates environment variable shapes at startup.
+ * Optional integrations (Jira, Google OAuth) remain optional in all environments.
+ */
 export function validateEnvironment(
   config: Record<string, unknown>,
 ): Record<string, unknown> {
@@ -97,6 +139,8 @@ export function validateEnvironment(
       `Environment validation failed:\n${messages.map((m) => `  - ${m}`).join('\n')}`,
     );
   }
+
+  validateProductionRequired(config);
 
   return config;
 }

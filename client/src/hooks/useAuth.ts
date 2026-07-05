@@ -6,8 +6,6 @@ import { registerUser, loginUser } from '@/lib/api/auth';
 import { RegisterPayload, LoginPayload } from '@/types/auth';
 import { useAuthContext } from '@/providers/AuthProvider';
 
-// ─── useRegister ──────────────────────────────────────────────────────────────
-
 export function useRegister() {
   const { login } = useAuthContext();
   const router = useRouter();
@@ -15,13 +13,11 @@ export function useRegister() {
   return useMutation({
     mutationFn: (payload: RegisterPayload) => registerUser(payload),
     onSuccess: (data) => {
-      login(data.accessToken, data.user);
-      router.push('/');
+      login(data.user);
+      router.push('/dashboard');
     },
   });
 }
-
-// ─── useLogin ─────────────────────────────────────────────────────────────────
 
 export function useLogin() {
   const { login } = useAuthContext();
@@ -30,8 +26,8 @@ export function useLogin() {
   return useMutation({
     mutationFn: (payload: LoginPayload) => loginUser(payload),
     onSuccess: (data) => {
-      login(data.accessToken, data.user);
-      router.push('/');
+      login(data.user);
+      router.push('/dashboard');
     },
   });
 }

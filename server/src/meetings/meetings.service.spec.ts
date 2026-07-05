@@ -59,7 +59,9 @@ describe('MeetingsService', () => {
       where: jest.fn().mockReturnThis(),
       andWhere: jest.fn().mockReturnThis(),
       orderBy: jest.fn().mockReturnThis(),
-      getMany: jest.fn().mockResolvedValue([]),
+      skip: jest.fn().mockReturnThis(),
+      take: jest.fn().mockReturnThis(),
+      getManyAndCount: jest.fn().mockResolvedValue([[], 0]),
     } as unknown as jest.Mocked<SelectQueryBuilder<Meeting>>;
 
     const module: TestingModule = await Test.createTestingModule({
@@ -180,20 +182,22 @@ describe('MeetingsService', () => {
   describe('findAll', () => {
     it('should filter by userId', async () => {
       const qb = meetingRepo.createQueryBuilder('meeting') as any;
-      qb.getMany.mockResolvedValue([]);
+      qb.getManyAndCount.mockResolvedValue([[], 0]);
 
-      await service.findAll(USER_ID);
+      await service.findAll(USER_ID, { page: 1, limit: 20 });
 
       expect(qb.where).toHaveBeenCalledWith('meeting.userId = :userId', {
         userId: USER_ID,
       });
+      expect(qb.skip).toHaveBeenCalledWith(0);
+      expect(qb.take).toHaveBeenCalledWith(20);
     });
 
     it('should apply search filter with andWhere', async () => {
       const qb = meetingRepo.createQueryBuilder() as any;
-      qb.getMany.mockResolvedValue([]);
+      qb.getManyAndCount.mockResolvedValue([[], 0]);
 
-      await service.findAll(USER_ID, 'standup');
+      await service.findAll(USER_ID, { page: 1, limit: 20, search: 'standup' });
 
       expect(qb.andWhere).toHaveBeenCalledWith(
         expect.stringContaining('ILIKE'),

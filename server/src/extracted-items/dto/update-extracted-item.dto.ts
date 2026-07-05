@@ -1,6 +1,7 @@
 import {
   Allow,
   IsEnum,
+  IsObject,
   IsOptional,
   IsString,
   MinLength,
@@ -11,6 +12,8 @@ import {
 } from 'class-validator';
 import { ExtractedItemType } from '../enums/extracted-item-type.enum';
 import { ExtractedItemPriority } from '../enums/extracted-item-priority.enum';
+import { JiraAdfDocument } from '../../common/jira-document/jira-document.types';
+import { isValidAdfDocument } from '../../common/jira-document/blocks-to-adf';
 
 @ValidatorConstraint({ name: 'atLeastOneExtractedItemField', async: false })
 class AtLeastOneExtractedItemFieldConstraint
@@ -34,6 +37,17 @@ class AtLeastOneExtractedItemFieldConstraint
   }
 }
 
+@ValidatorConstraint({ name: 'isJiraAdfDocument', async: false })
+class IsJiraAdfDocumentConstraint implements ValidatorConstraintInterface {
+  validate(value: unknown) {
+    return isValidAdfDocument(value);
+  }
+
+  defaultMessage(): string {
+    return 'description must be a valid Jira ADF document.';
+  }
+}
+
 export class UpdateExtractedItemDto {
   /** Triggers whole-object validation via class-validator. */
   @Validate(AtLeastOneExtractedItemFieldConstraint)
@@ -50,9 +64,9 @@ export class UpdateExtractedItemDto {
   title?: string;
 
   @IsOptional()
-  @IsString()
-  @MinLength(1)
-  description?: string;
+  @IsObject()
+  @Validate(IsJiraAdfDocumentConstraint)
+  description?: JiraAdfDocument;
 
   @IsOptional()
   @IsEnum(ExtractedItemPriority)

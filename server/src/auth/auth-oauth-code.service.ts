@@ -1,23 +1,14 @@
-import { Inject, Injectable, OnModuleDestroy } from '@nestjs/common';
-import { ConfigType } from '@nestjs/config';
+import { Inject, Injectable } from '@nestjs/common';
 import Redis from 'ioredis';
 import { randomUUID } from 'crypto';
-import { redisConfiguration } from '../common/config/redis.config';
+import { REDIS_CLIENT } from '../common/redis/redis.constants';
 
 @Injectable()
-export class AuthOauthCodeService implements OnModuleDestroy {
-  private readonly redis: Redis;
+export class AuthOauthCodeService {
   private readonly ttlSeconds = 60;
   private readonly keyPrefix = 'oauth:code:';
 
-  constructor(
-    @Inject(redisConfiguration.KEY)
-    redisConfig: ConfigType<typeof redisConfiguration>,
-  ) {
-    this.redis = new Redis(redisConfig.url, {
-      ...(redisConfig.useTls ? { tls: { rejectUnauthorized: false } } : {}),
-    });
-  }
+  constructor(@Inject(REDIS_CLIENT) private readonly redis: Redis) {}
 
   async createCode(accessToken: string): Promise<string> {
     const code = randomUUID();
@@ -36,9 +27,5 @@ export class AuthOauthCodeService implements OnModuleDestroy {
       await this.redis.del(key);
     }
     return token;
-  }
-
-  onModuleDestroy(): void {
-    this.redis.disconnect();
   }
 }

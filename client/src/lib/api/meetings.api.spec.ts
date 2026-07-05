@@ -94,22 +94,51 @@ describe('meetingsApi', () => {
   // ── getAll ──────────────────────────────────────────────────────────────────
 
   describe('getAll', () => {
-    it('should GET /meetings and return the array', async () => {
+    it('should GET /meetings and return paginated results', async () => {
       const meetings = [buildMeeting(), buildMeeting({ id: 'uuid-5678' })];
-      mock.onGet('/meetings').reply(200, wrapInApiResponse(meetings));
+      const paginated = {
+        items: meetings,
+        total: 2,
+        page: 1,
+        limit: 50,
+        totalPages: 1,
+      };
+      mock.onGet('/meetings').reply(200, wrapInApiResponse(paginated));
 
       const result = await meetingsApi.getAll();
 
       expect(mock.history.get[0].url).toBe('/meetings');
-      expect(result).toEqual(meetings);
-      expect(result).toHaveLength(2);
+      expect(result).toEqual(paginated);
+      expect(result.items).toHaveLength(2);
     });
 
-    it('should return an empty array when no meetings exist', async () => {
-      mock.onGet('/meetings').reply(200, wrapInApiResponse([]));
+    it('should pass search query params', async () => {
+      mock.onGet('/meetings').reply(200, wrapInApiResponse({
+        items: [],
+        total: 0,
+        page: 1,
+        limit: 50,
+        totalPages: 1,
+      }));
+
+      await meetingsApi.getAll({ search: 'standup' });
+
+      expect(mock.history.get[0].params).toEqual(
+        expect.objectContaining({ search: 'standup' }),
+      );
+    });
+
+    it('should return an empty page when no meetings exist', async () => {
+      mock.onGet('/meetings').reply(200, wrapInApiResponse({
+        items: [],
+        total: 0,
+        page: 1,
+        limit: 50,
+        totalPages: 1,
+      }));
 
       const result = await meetingsApi.getAll();
-      expect(result).toEqual([]);
+      expect(result.items).toEqual([]);
     });
 
     it('should throw on network error', async () => {

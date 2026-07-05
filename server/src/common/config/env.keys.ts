@@ -47,6 +47,7 @@ export const EnvKey = {
 
   // Redis
   RedisUrl: 'REDIS_URL',
+  RedisTlsRejectUnauthorized: 'REDIS_TLS_REJECT_UNAUTHORIZED',
 } as const;
 
 export type EnvKeyName = (typeof EnvKey)[keyof typeof EnvKey];

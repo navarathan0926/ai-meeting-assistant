@@ -9,7 +9,7 @@ import {
 export const extractedItemsApi = {
   listByMeeting: async (meetingId: string): Promise<ExtractedItem[]> => {
     const response = await apiClient.get<ApiResponse<ExtractedItem[]>>(
-      `/meetings/${meetingId}/extracted-items`,
+      `/extracted-items/meeting/${meetingId}`,
     );
     return response.data.data;
   },

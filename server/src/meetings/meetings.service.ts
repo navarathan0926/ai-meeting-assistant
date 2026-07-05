@@ -88,13 +88,21 @@ export class MeetingsService {
     return this.toResponse(meeting);
   }
 
-  async findAll(userId: string, search?: string): Promise<MeetingResponse[]> {
+  async findAll(
+    userId: string,
+    options: { page: number; limit: number; search?: string },
+  ): Promise<{ items: MeetingResponse[]; total: number }> {
+    const { page, limit, search } = options;
+    const skip = (page - 1) * limit;
+
     const qb = this.meetingRepository
       .createQueryBuilder('meeting')
       .leftJoinAndSelect('meeting.transcription', 'transcription')
       .leftJoinAndSelect('meeting.summary', 'summary')
       .where('meeting.userId = :userId', { userId })
-      .orderBy('meeting.createdAt', 'DESC');
+      .orderBy('meeting.createdAt', 'DESC')
+      .skip(skip)
+      .take(limit);
 
     if (search?.trim()) {
       qb.andWhere(
@@ -103,8 +111,12 @@ export class MeetingsService {
       );
     }
 
-    const meetings = await qb.getMany();
-    return Promise.all(meetings.map((m) => this.toResponse(m)));
+    const [meetings, total] = await qb.getManyAndCount();
+    const items = await Promise.all(
+      meetings.map((meeting) => this.toResponse(meeting, undefined, false)),
+    );
+
+    return { items, total };
   }
 
   async deleteMeeting(userId: string, id: string): Promise<void> {
@@ -157,14 +169,20 @@ export class MeetingsService {
     return `${randomUUID()}${ext}`;
   }
 
-  private toResponse(meeting: Meeting, jobId?: string): MeetingResponse {
+  private toResponse(
+    meeting: Meeting,
+    jobId?: string,
+    includeAudioUrl = true,
+  ): MeetingResponse {
     let audioUrl: string | undefined;
-    try {
-      audioUrl = this.blobStorageService.getReadSasUrl(meeting.storedFileName);
-    } catch (err) {
-      this.logger.warn(
-        `Unable to generate SAS URL for meeting ${meeting.id}: ${(err as Error).message}`,
-      );
+    if (includeAudioUrl) {
+      try {
+        audioUrl = this.blobStorageService.getReadSasUrl(meeting.storedFileName);
+      } catch (err) {
+        this.logger.warn(
+          `Unable to generate SAS URL for meeting ${meeting.id}: ${(err as Error).message}`,
+        );
+      }
     }
 
     return {

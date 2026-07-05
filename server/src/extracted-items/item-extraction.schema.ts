@@ -1,7 +1,16 @@
+import { RawDescriptionBlock } from '../common/jira-document/jira-document.types';
+import {
+  blocksToPlainText,
+  rawBlocksToDocumentBlocks,
+} from '../common/jira-document/blocks-to-adf';
+import { mergeJiraDocuments } from '../common/jira-document/merge-jira-documents';
+
+export type { RawDescriptionBlock };
+
 export interface RawExtractedItem {
   type: string;
   title: string;
-  description: string;
+  description_blocks: RawDescriptionBlock[];
   priority: string;
   context_snippet: string;
   scope: string;
@@ -10,6 +19,29 @@ export interface RawExtractedItem {
 export interface ItemExtractionOutput {
   items: RawExtractedItem[];
 }
+
+const DESCRIPTION_BLOCK_SCHEMA = {
+  type: 'object',
+  properties: {
+    type: {
+      type: 'string',
+      enum: ['heading', 'paragraph', 'bulletList', 'orderedList', 'table'],
+    },
+    level: { type: 'integer' },
+    text: { type: 'string' },
+    items: { type: 'array', items: { type: 'string' } },
+    headers: { type: 'array', items: { type: 'string' } },
+    rows: {
+      type: 'array',
+      items: {
+        type: 'array',
+        items: { type: 'string' },
+      },
+    },
+  },
+  required: ['type', 'level', 'text', 'items', 'headers', 'rows'],
+  additionalProperties: false,
+} as const;
 
 export const ITEM_EXTRACTION_JSON_SCHEMA = {
   name: 'meeting_items_extraction',
@@ -27,7 +59,10 @@ export const ITEM_EXTRACTION_JSON_SCHEMA = {
               enum: ['bug', 'task', 'story', 'feature'],
             },
             title: { type: 'string' },
-            description: { type: 'string' },
+            description_blocks: {
+              type: 'array',
+              items: DESCRIPTION_BLOCK_SCHEMA,
+            },
             priority: {
               type: 'string',
               enum: ['low', 'medium', 'high'],
@@ -42,7 +77,7 @@ export const ITEM_EXTRACTION_JSON_SCHEMA = {
           required: [
             'type',
             'title',
-            'description',
+            'description_blocks',
             'priority',
             'context_snippet',
             'scope',
@@ -252,6 +287,10 @@ function mergeRelatedSubtasks(items: RawExtractedItem[]): RawExtractedItem[] {
   return result;
 }
 
+function itemDescriptionText(item: RawExtractedItem): string {
+  return blocksToPlainText(rawBlocksToDocumentBlocks(item.description_blocks));
+}
+
 function shouldMergeRelatedWork(a: RawExtractedItem, b: RawExtractedItem): boolean {
   if (normalizeScope(a.scope) === normalizeScope(b.scope)) {
     return true;
@@ -259,8 +298,8 @@ function shouldMergeRelatedWork(a: RawExtractedItem, b: RawExtractedItem): boole
 
   const titleOverlap = tokenOverlap(a.title, b.title);
   const combinedOverlap = tokenOverlap(
-    `${a.title} ${a.description}`,
-    `${b.title} ${b.description}`,
+    `${a.title} ${itemDescriptionText(a)}`,
+    `${b.title} ${itemDescriptionText(b)}`,
   );
   const contextOverlap = contextOverlapScore(a, b);
   const scopesRelated = scopesAreRelated(a, b);
@@ -358,11 +397,17 @@ function mergeItems(
       ? primary.type
       : secondary.type;
 
+  const mergedAdf = mergeJiraDocuments(
+    primary.description_blocks,
+    secondary.description_blocks,
+    secondary.title,
+  );
+
   return {
     type,
     title: primary.title,
     scope: primary.scope || secondary.scope,
-    description: mergeDescriptions(primary, secondary),
+    description_blocks: adfToRawBlocks(mergedAdf),
     context_snippet: pickLongerText(
       primary.context_snippet,
       secondary.context_snippet,
@@ -371,30 +416,135 @@ function mergeItems(
   };
 }
 
-function mergeDescriptions(
-  primary: RawExtractedItem,
-  secondary: RawExtractedItem,
-): string {
-  const primaryDesc = primary.description.trim();
-  const secondaryDesc = secondary.description.trim();
+/** Round-trip ADF back to raw blocks for storage consistency. */
+function adfToRawBlocks(doc: {
+  content: Array<{ type: string; attrs?: { level?: number }; content?: unknown[] }>;
+}): RawDescriptionBlock[] {
+  const blocks: RawDescriptionBlock[] = [];
 
-  if (!secondaryDesc || primaryDesc.includes(secondaryDesc)) {
-    return primaryDesc;
-  }
-  if (secondaryDesc.includes(primaryDesc)) {
-    return secondaryDesc;
+  for (const node of doc.content) {
+    switch (node.type) {
+      case 'heading': {
+        const text = extractTextFromAdfContent(node.content);
+        blocks.push({
+          type: 'heading',
+          level: node.attrs?.level ?? 2,
+          text,
+          items: [],
+          headers: [],
+          rows: [],
+        });
+        break;
+      }
+      case 'paragraph': {
+        const text = extractTextFromAdfContent(node.content);
+        if (text) {
+          blocks.push({
+            type: 'paragraph',
+            level: 0,
+            text,
+            items: [],
+            headers: [],
+            rows: [],
+          });
+        }
+        break;
+      }
+      case 'bulletList':
+      case 'orderedList': {
+        const items = extractListItems(node.content);
+        if (items.length > 0) {
+          blocks.push({
+            type: node.type,
+            level: 0,
+            text: '',
+            items,
+            headers: [],
+            rows: [],
+          });
+        }
+        break;
+      }
+      case 'table': {
+        const { headers, rows } = extractTable(node.content);
+        blocks.push({
+          type: 'table',
+          level: 0,
+          text: '',
+          items: [],
+          headers,
+          rows,
+        });
+        break;
+      }
+      default:
+        break;
+    }
   }
 
-  const subStepLine = `- ${secondary.title}: ${secondaryDesc}`;
-  if (primaryDesc.includes(subStepLine) || primaryDesc.includes(secondary.title)) {
-    return primaryDesc;
+  return blocks;
+}
+
+function extractTextFromAdfContent(content: unknown[] | undefined): string {
+  if (!content) {
+    return '';
+  }
+  return content
+    .filter((n): n is { type: string; text?: string } => typeof n === 'object' && n !== null)
+    .filter((n) => n.type === 'text')
+    .map((n) => n.text ?? '')
+    .join('');
+}
+
+function extractListItems(content: unknown[] | undefined): string[] {
+  if (!content) {
+    return [];
+  }
+  return content
+    .filter((n): n is { type: string; content?: unknown[] } => typeof n === 'object' && n !== null)
+    .filter((n) => n.type === 'listItem')
+    .map((item) => {
+      const paragraph = item.content?.[0] as { content?: unknown[] } | undefined;
+      return extractTextFromAdfContent(paragraph?.content);
+    })
+    .filter(Boolean);
+}
+
+function extractTable(content: unknown[] | undefined): {
+  headers: string[];
+  rows: string[][];
+} {
+  if (!content?.length) {
+    return { headers: [], rows: [] };
   }
 
-  if (/sub-steps?|acceptance criteria|scope/i.test(primaryDesc)) {
-    return `${primaryDesc}\n${subStepLine}`;
-  }
+  const rows = content.filter(
+    (n): n is { type: string; content?: unknown[] } =>
+      typeof n === 'object' && n !== null && (n as { type: string }).type === 'tableRow',
+  );
 
-  return `${primaryDesc}\n\nSub-steps (from meeting):\n${subStepLine}`;
+  const headers =
+    rows.length > 0
+      ? (rows[0].content ?? [])
+          .filter(
+            (c): c is { type: string; content?: unknown[] } =>
+              typeof c === 'object' &&
+              c !== null &&
+              (c as { type: string }).type === 'tableHeader',
+          )
+          .map((cell) => extractTextFromAdfContent(cell.content))
+      : [];
+
+  const dataRows = rows.slice(headers.length > 0 ? 1 : 0).map((row) =>
+    (row.content ?? [])
+      .filter(
+        (c): c is { type: string; content?: unknown[] } =>
+          typeof c === 'object' && c !== null,
+      )
+      .map((cell) => extractTextFromAdfContent(cell.content)),
+  );
+
+  return { headers, rows: dataRows };
 }
 
 function normalizeScope(scope: string): string {

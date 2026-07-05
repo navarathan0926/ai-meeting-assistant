@@ -5,7 +5,7 @@ describe('meetingKeys', () => {
   const userId = 'user-abc';
 
   it('should return a user-scoped base key for "all"', () => {
-    expect(meetingKeys.all(userId)).toEqual(['meetings', userId]);
+    expect(meetingKeys.all(userId)).toEqual(['meetings', userId, '']);
   });
 
   it('should return a user-scoped key for "detail"', () => {

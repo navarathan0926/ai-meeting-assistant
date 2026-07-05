@@ -6,6 +6,8 @@ import { extractedItemsApi } from '@/lib/api/extracted-items.api';
 import {
   ApproveExtractedItemResult,
   ExtractedItem,
+  ExtractedItemStatus,
+  normalizeExtractedItemDescription,
   UpdateExtractedItemPayload,
 } from '@/types/extracted-item';
 import { useToast } from '@/providers/ToastProvider';
@@ -30,16 +32,31 @@ export function useExtractedItems(meetingId: string | null) {
 
   return useQuery<ExtractedItem[], Error>({
     queryKey: extractedItemKeys.byMeeting(userId, meetingId ?? ''),
-    queryFn: () => extractedItemsApi.listByMeeting(meetingId!),
+    queryFn: async () => {
+      const items = await extractedItemsApi.listByMeeting(meetingId!);
+      return items.map((entry) => ({
+        ...entry,
+        description: normalizeExtractedItemDescription(entry.description),
+      }));
+    },
     enabled: !!meetingId && !!userId,
     refetchInterval: (query) => {
       const items = query.state.data;
       if (items === undefined) {
         return 5000;
       }
+
+      const hasApproved = items.some(
+        (item) => item.status === ExtractedItemStatus.Approved,
+      );
+      if (hasApproved) {
+        return 3000;
+      }
+
       if (items.length > 0) {
         return false;
       }
+
       const deadline = pollDeadlineRef.current;
       if (deadline && Date.now() < deadline) {
         return 5000;
@@ -60,11 +77,22 @@ export function useUpdateExtractedItem(meetingId: string) {
     { id: string; payload: UpdateExtractedItemPayload }
   >({
     mutationFn: ({ id, payload }) => extractedItemsApi.update(id, payload),
-    onSuccess: () => {
+    onSuccess: (updatedItem) => {
       if (user?.id) {
-        queryClient.invalidateQueries({
-          queryKey: extractedItemKeys.byMeeting(user.id, meetingId),
-        });
+        queryClient.setQueryData<ExtractedItem[]>(
+          extractedItemKeys.byMeeting(user.id, meetingId),
+          (items) =>
+            items?.map((entry) =>
+              entry.id === updatedItem.id
+                ? {
+                    ...updatedItem,
+                    description: normalizeExtractedItemDescription(
+                      updatedItem.description,
+                    ),
+                  }
+                : entry,
+            ) ?? [],
+        );
       }
       showToast('Item updated.', 'success');
     },
@@ -115,8 +143,12 @@ export function useApproveExtractedItem(meetingId: string) {
         );
         return;
       }
-      if (result.jiraIssueKey) {
+      if (result.status === ExtractedItemStatus.Sent && result.jiraIssueKey) {
         showToast(`Sent to Jira as ${result.jiraIssueKey}.`, 'success');
+        return;
+      }
+      if (result.status === ExtractedItemStatus.Approved) {
+        showToast('Sending to Jira…', 'success');
         return;
       }
       showToast('Item approved.', 'success');

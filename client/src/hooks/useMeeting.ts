@@ -7,7 +7,8 @@ import { useToast } from '@/providers/ToastProvider';
 import { useAuthContext } from '@/providers/AuthProvider';
 
 export const meetingKeys = {
-  all: (userId: string) => ['meetings', userId] as const,
+  all: (userId: string, search?: string) =>
+    ['meetings', userId, search ?? ''] as const,
   detail: (userId: string, id: string) => ['meetings', userId, id] as const,
 };
 
@@ -19,7 +20,7 @@ export function useUploadMeeting() {
     mutationFn: (file: File) => meetingsApi.upload(file),
     onSuccess: () => {
       if (user?.id) {
-        queryClient.invalidateQueries({ queryKey: meetingKeys.all(user.id) });
+        queryClient.invalidateQueries({ queryKey: ['meetings', user.id] });
       }
     },
   });
@@ -42,16 +43,17 @@ export function useMeeting(id: string | null) {
   });
 }
 
-export function useMeetings() {
+export function useMeetings(search?: string) {
   const { user } = useAuthContext();
   const userId = user?.id ?? '';
 
-  return useQuery<Meeting[], Error>({
-    queryKey: meetingKeys.all(userId),
-    queryFn: meetingsApi.getAll,
+  return useQuery({
+    queryKey: meetingKeys.all(userId, search),
+    queryFn: () =>
+      meetingsApi.getAll({ page: 1, limit: 50, search: search?.trim() || undefined }),
     enabled: !!userId,
     refetchInterval: (query) => {
-      const meetings = query.state.data;
+      const meetings = query.state.data?.items;
       if (!meetings) return false;
       const hasPending = meetings.some(
         (m) =>
@@ -73,7 +75,7 @@ export function useDeleteMeeting(onSuccess?: (id: string) => void) {
     onSuccess: (_, id) => {
       if (user?.id) {
         queryClient.removeQueries({ queryKey: meetingKeys.detail(user.id, id) });
-        queryClient.invalidateQueries({ queryKey: meetingKeys.all(user.id) });
+        queryClient.invalidateQueries({ queryKey: ['meetings', user.id] });
       }
       showToast('Meeting deleted successfully!', 'success');
       onSuccess?.(id);

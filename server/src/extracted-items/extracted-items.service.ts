@@ -16,6 +16,7 @@ import {
 } from './interfaces/extracted-item-response.interface';
 import { MeetingsService } from '../meetings/meetings.service';
 import { JiraService } from '../jira/jira.service';
+import { JiraSendService } from '../jira/jira-send.service';
 
 @Injectable()
 export class ExtractedItemsService {
@@ -26,6 +27,7 @@ export class ExtractedItemsService {
     private readonly extractedItemRepository: Repository<ExtractedItem>,
     private readonly meetingsService: MeetingsService,
     private readonly jiraService: JiraService,
+    private readonly jiraSendService: JiraSendService,
   ) {}
 
   async findByMeeting(
@@ -54,6 +56,7 @@ export class ExtractedItemsService {
     }
 
     Object.assign(item, dto);
+    item.jiraSyncError = null;
     const saved = await this.extractedItemRepository.save(item);
     return this.toResponse(saved);
   }
@@ -84,7 +87,10 @@ export class ExtractedItemsService {
         status: ExtractedItemStatus.Draft,
         jiraIssueKey: IsNull(),
       },
-      { status: ExtractedItemStatus.Approved },
+      {
+        status: ExtractedItemStatus.Approved,
+        jiraSyncError: null,
+      },
     );
 
     if (claimResult.affected === 0) {
@@ -135,21 +141,13 @@ export class ExtractedItemsService {
     }
 
     try {
-      const result = await this.jiraService.createIssue({
-        type: item.type,
-        title: item.title,
-        description: item.description,
-        priority: item.priority,
-      });
-
-      item.jiraIssueKey = result.issueKey;
-      item.status = ExtractedItemStatus.Sent;
-      const saved = await this.extractedItemRepository.save(item);
-      return this.toResponse(saved);
+      await this.jiraSendService.enqueueSend(itemId);
+      this.logger.log(`Queued Jira send for extracted item ${itemId}`);
+      return this.toResponse(item);
     } catch (error) {
       const message = (error as Error).message ?? String(error);
       this.logger.error(
-        `Jira creation failed for extracted item ${itemId}: ${message}`,
+        `Failed to queue Jira send for extracted item ${itemId}: ${message}`,
       );
       return this.revertToDraftWithError(item, message);
     }
@@ -161,6 +159,7 @@ export class ExtractedItemsService {
   ): Promise<ApproveExtractedItemResponse> {
     item.status = ExtractedItemStatus.Draft;
     item.jiraIssueKey = null;
+    item.jiraSyncError = message;
     const saved = await this.extractedItemRepository.save(item);
     return {
       ...this.toResponse(saved),
@@ -200,6 +199,7 @@ export class ExtractedItemsService {
       jiraIssueUrl: item.jiraIssueKey
         ? this.jiraService.getIssueBrowseUrl(item.jiraIssueKey)
         : null,
+      jiraSyncError: item.jiraSyncError,
       createdAt: item.createdAt,
       updatedAt: item.updatedAt,
     };

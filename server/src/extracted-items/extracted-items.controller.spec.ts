@@ -5,6 +5,9 @@ import { ExtractedItemType } from './enums/extracted-item-type.enum';
 import { ExtractedItemPriority } from './enums/extracted-item-priority.enum';
 import { ExtractedItemStatus } from './enums/extracted-item-status.enum';
 import { User } from '../auth/entities/user.entity';
+import { blocksToAdf } from '../common/jira-document/blocks-to-adf';
+
+const sampleAdf = blocksToAdf([{ type: 'paragraph', text: 'Details' }]);
 
 const TEST_USER: User = {
   id: 'user-uuid-1',
@@ -46,7 +49,7 @@ describe('ExtractedItemsController', () => {
     meetingId: 'meeting-1',
     type: ExtractedItemType.Task,
     title: 'Fix bug',
-    description: 'Details',
+    description: sampleAdf,
     priority: ExtractedItemPriority.High,
     contextSnippet: 'Snippet',
     status: ExtractedItemStatus.Draft,
