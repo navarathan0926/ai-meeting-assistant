@@ -70,8 +70,18 @@ jobs:
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
+      - name: Run database migrations
+        run: npm run typeorm migration:run -- -d dist/data-source.js
+        working-directory: server
+        env:
+          DB_HOST: ${{ secrets.DB_HOST }}
+          DB_PORT: ${{ secrets.DB_PORT }}
+          DB_USERNAME: ${{ secrets.DB_USERNAME }}
+          DB_PASSWORD: ${{ secrets.DB_PASSWORD }}
+          DB_NAME: ${{ secrets.DB_NAME }}
+
       # Deploy new image without touching env vars already set in the Container App.
-      # Ingress target port is pinned to 4000 to match EXPOSE in the Dockerfile;
+      # Ingress target port is pinned to 4000 to match EXPOSE in the Dockerfile,
       # the default of 80 causes "activation failed" when the app starts on 4000.
       - name: Deploy to Container Apps
         uses: azure/container-apps-deploy-action@v1
