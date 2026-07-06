@@ -10,14 +10,14 @@ import {
 } from 'react';
 import { usePathname, useRouter } from 'next/navigation';
 import { useQueryClient } from '@tanstack/react-query';
-import { fetchCurrentUser, logoutUser } from '@/lib/auth';
-import { AuthUser } from '@/types/auth';
+import { fetchCurrentUser, logoutUser, clearAccessToken, getAccessToken, setAccessToken } from '@/lib/auth';
+import { AuthSession, AuthUser } from '@/types/auth';
 
 interface AuthContextValue {
   user: AuthUser | null;
   isAuthenticated: boolean;
   isLoading: boolean;
-  login: (user: AuthUser) => void;
+  login: (session: AuthSession) => void;
   logout: () => Promise<void>;
 }
 
@@ -42,6 +42,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       return;
     }
 
+    const token = getAccessToken();
+    if (!token) {
+      setUser(null);
+      setIsLoading(false);
+      return;
+    }
+
     let cancelled = false;
     setIsLoading(true);
 
@@ -53,6 +60,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       })
       .catch(() => {
         if (!cancelled) {
+          clearAccessToken();
           setUser(null);
         }
       })
@@ -68,19 +76,21 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, [pathname]);
 
   const login = useCallback(
-    (userData: AuthUser) => {
+    (session: AuthSession) => {
       queryClient.clear();
-      setUser(userData);
+      setAccessToken(session.accessToken);
+      setUser(session.user);
     },
     [queryClient],
   );
 
   const logout = useCallback(async () => {
     queryClient.clear();
+    clearAccessToken();
     try {
       await logoutUser();
     } catch {
-      // Cookie may already be cleared; still reset client state.
+      // Token may already be invalid; still reset client state.
     }
     setUser(null);
     router.push('/login');

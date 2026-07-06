@@ -57,7 +57,7 @@ function LoginForm() {
     setIsExchangingCode(true);
     exchangeOAuthCode(code)
       .then((data) => {
-        login(data.user);
+        login(data);
         router.replace('/dashboard');
       })
       .catch(() => {

@@ -13,7 +13,7 @@ export function useRegister() {
   return useMutation({
     mutationFn: (payload: RegisterPayload) => registerUser(payload),
     onSuccess: (data) => {
-      login(data.user);
+      login(data);
       router.push('/dashboard');
     },
   });
@@ -26,7 +26,7 @@ export function useLogin() {
   return useMutation({
     mutationFn: (payload: LoginPayload) => loginUser(payload),
     onSuccess: (data) => {
-      login(data.user);
+      login(data);
       router.push('/dashboard');
     },
   });
