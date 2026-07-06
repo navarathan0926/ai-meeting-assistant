@@ -7,7 +7,7 @@ const DURATION_PATTERN = /^(\d+)([smhd])$/;
 const IP_V4_PATTERN = /^\d{1,3}(\.\d{1,3}){3}$/;
 
 const isProduction = process.env.NODE_ENV === 'production';
-const domain = isProduction ? 'meetingly.live' : undefined;
+const domain = isProduction ? '.meetingly.live' : undefined;
 
 export interface AuthCookieOptions {
   maxAgeMs?: number;
