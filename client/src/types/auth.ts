@@ -1,3 +1,5 @@
+export const ACCESS_TOKEN_KEY = 'access_token';
+
 export interface AuthUser {
   id: string;
   email: string;
@@ -6,6 +8,7 @@ export interface AuthUser {
 }
 
 export interface AuthSession {
+  accessToken: string;
   user: AuthUser;
 }
 

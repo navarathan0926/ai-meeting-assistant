@@ -22,13 +22,6 @@ import { CurrentUser } from '../common/decorators/current-user.decorator';
 import { GoogleOauthGuard } from './guards/google-oauth.guard';
 import { User } from './entities/user.entity';
 import { appConfiguration } from '../common/config/app.config';
-import { authConfiguration } from '../common/config/auth.config';
-import {
-  clearAuthCookie,
-  parseJwtDurationToMs,
-  resolveAuthCookieDomain,
-  setAuthCookie,
-} from './auth-cookie.util';
 import { toUserProfile, UserProfileResponse } from './interfaces/user-profile.interface';
 
 interface GoogleAuthRequest extends Request {
@@ -45,59 +38,24 @@ export class AuthController {
     private readonly authService: AuthService,
     @Inject(appConfiguration.KEY)
     private readonly appConfig: ConfigType<typeof appConfiguration>,
-    @Inject(authConfiguration.KEY)
-    private readonly authConfig: ConfigType<typeof authConfiguration>,
   ) {}
-
-  private authCookieOptions() {
-    const isProduction = this.appConfig.nodeEnv === 'production';
-
-    return {
-      secure: isProduction,
-      domain: isProduction
-        ? resolveAuthCookieDomain(this.appConfig.clientUrl)
-        : undefined,
-    };
-  }
-
-  private applyAuthCookie(res: Response, accessToken: string): void {
-    setAuthCookie(res, accessToken, {
-      ...this.authCookieOptions(),
-      maxAgeMs: parseJwtDurationToMs(this.authConfig.jwtExpiresIn),
-    });
-  }
 
   @Throttle({ default: { limit: 5, ttl: 60_000 } })
   @Post('register')
-  async register(
-    @Body() registerDto: RegisterDto,
-    @Res({ passthrough: true }) res: Response,
-  ) {
-    const result = await this.authService.register(registerDto);
-    this.applyAuthCookie(res, result.accessToken);
-    return { user: result.user };
+  register(@Body() registerDto: RegisterDto) {
+    return this.authService.register(registerDto);
   }
 
   @Throttle({ default: { limit: 5, ttl: 60_000 } })
   @Post('login')
-  async login(
-    @Body() loginDto: LoginDto,
-    @Res({ passthrough: true }) res: Response,
-  ) {
-    const result = await this.authService.login(loginDto);
-    this.applyAuthCookie(res, result.accessToken);
-    return { user: result.user };
+  login(@Body() loginDto: LoginDto) {
+    return this.authService.login(loginDto);
   }
 
   @Throttle({ default: { limit: 10, ttl: 60_000 } })
   @Post('oauth/exchange')
-  async exchangeOAuthCode(
-    @Body() dto: ExchangeOAuthCodeDto,
-    @Res({ passthrough: true }) res: Response,
-  ) {
-    const result = await this.authService.exchangeOAuthCode(dto.code);
-    this.applyAuthCookie(res, result.accessToken);
-    return { user: result.user };
+  exchangeOAuthCode(@Body() dto: ExchangeOAuthCodeDto) {
+    return this.authService.exchangeOAuthCode(dto.code);
   }
 
   @Get('google')
@@ -132,7 +90,7 @@ export class AuthController {
   @Auth()
   @Post('logout')
   @HttpCode(HttpStatus.NO_CONTENT)
-  logout(@Res({ passthrough: true }) res: Response): void {
-    clearAuthCookie(res, this.authCookieOptions());
+  logout(): void {
+    // Stateless JWT — client clears the stored token.
   }
 }

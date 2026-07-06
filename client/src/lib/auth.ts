@@ -1,5 +1,20 @@
 import apiClient from './axios';
-import { AuthUser } from '@/types/auth';
+import { ACCESS_TOKEN_KEY, AuthUser } from '@/types/auth';
+
+export function getAccessToken(): string | null {
+  if (typeof window === 'undefined') {
+    return null;
+  }
+  return localStorage.getItem(ACCESS_TOKEN_KEY);
+}
+
+export function setAccessToken(token: string): void {
+  localStorage.setItem(ACCESS_TOKEN_KEY, token);
+}
+
+export function clearAccessToken(): void {
+  localStorage.removeItem(ACCESS_TOKEN_KEY);
+}
 
 export async function logoutUser(): Promise<void> {
   await apiClient.post('/auth/logout');
