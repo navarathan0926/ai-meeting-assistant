@@ -18,6 +18,7 @@ import { Transcription } from '../transcriptions/entities/transcription.entity';
 import { Summary } from '../summaries/entities/summary.entity';
 import { User } from '../auth/entities/user.entity';
 import { ExtractedItem } from '../extracted-items/entities/extracted-item.entity';
+import { ProjectContext } from '../jira/entities/project-context.entity';
 import { buildDatabaseConfig } from '../common/config/database.config';
 
 // Ensure .env is loaded when this file is imported by the CLI
@@ -39,7 +40,14 @@ export function buildDataSourceOptions(): DataSourceOptions {
     username: db.username,
     password: db.password,
     database: db.database,
-    entities: [Meeting, Transcription, Summary, User, ExtractedItem],
+    entities: [
+      Meeting,
+      Transcription,
+      Summary,
+      User,
+      ExtractedItem,
+      ProjectContext,
+    ],
     synchronize: false,
     logging: false,
     ssl: db.ssl ? { rejectUnauthorized: false } : false,

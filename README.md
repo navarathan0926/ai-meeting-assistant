@@ -79,8 +79,8 @@ npm run dev                   # Starts on http://localhost:3000
 | 4     | Deployment & Infrastructure (Docker, CI/CD)   | ✅ Done     |
 | 5     | Async Processing (BullMQ + Redis)             | ✅ Done     |
 | 6     | Testing & QA (Jest + Playwright)              | ✅ Done     |
-| 7     | Security & Performance                        | 🔜 Planned  |
-| 8     | Jira Draft Extraction & Approval              | 🔜 Planned  |
+| 7     | Security & Performance                        | ✅ Done     |
+| 8     | Jira Draft Extraction & Approval              | ✅ Done     |
 | 9     | Multi-Project Jira & AI Project Selection     | 🔜 Planned  |
 | 10    | Roles (USER / ADMIN) & Approval Permissions   | 🔜 Planned  |
 | 11    | SUPERADMIN & Multi-Organization Support       | 🔜 Planned  |

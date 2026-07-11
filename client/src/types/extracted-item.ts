@@ -42,6 +42,12 @@ export interface ExtractedItem {
   jiraIssueKey: string | null;
   jiraIssueUrl: string | null;
   jiraSyncError?: string | null;
+  suggestedProjectKey: string | null;
+  projectConfidence: number | null;
+  extractionConfidence: number | null;
+  finalProjectKey: string | null;
+  needsProjectReview: boolean;
+  lowExtractionConfidence: boolean;
   createdAt: string;
   updatedAt: string;
 }
@@ -55,6 +61,7 @@ export interface UpdateExtractedItemPayload {
   title?: string;
   description?: JiraAdfDocument;
   priority?: ExtractedItemPriority;
+  finalProjectKey?: string;
 }
 
 export function normalizeExtractedItemDescription(

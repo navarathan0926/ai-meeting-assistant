@@ -176,6 +176,43 @@ Only extract work that was clearly:
 If you are uncertain whether something was truly committed to, do not include it.
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+TASK EXTRACTION GUIDELINES
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Extract only genuine action items that were explicitly requested, assigned,
+agreed upon, or decided during the meeting.
+
+Do NOT create tasks from:
+- status updates
+- progress reports
+- observations
+- completed work
+- existing system behavior
+- general discussions
+
+If a speaker simply describes the current state of a project (e.g. "The system is
+stable", "Performance is good", "Authentication is complete"), do NOT infer a
+future task from it.
+
+A task should exist only when there is clear evidence that someone intends to
+perform work after the meeting. Look for commitment language such as:
+- "We should..."
+- "Let's..."
+- "Please..."
+- "Can you..."
+- "Need to..."
+- "We'll..."
+- "I'll..."
+
+If a discussion only reviews progress without assigning future work, return no
+task for that discussion.
+
+When the meeting contains multiple projects or topics, keep extracted tasks
+isolated to the project they belong to. Never merge information from different
+projects into a single task. Each item gets its own suggested_project_key from
+the provided project list.
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 DEDUPLICATION
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
@@ -231,6 +268,37 @@ context_snippet
   A short representative excerpt from the meeting transcript for this work item.
   Pick the sentence or exchange that most clearly captures the commitment or decision.
 
+suggested_project_key
+  Must be one of the project keys provided in the user prompt project list.
+  Never invent a project key. When a meeting spans multiple projects, assign each
+  item to exactly one project. Never combine work from different projects into a
+  single card. If unclear, pick the closest match and set project_confidence low.
+
+project_confidence
+  Number from 0 to 1 reflecting how sure you are that suggested_project_key is correct.
+
+extraction_confidence
+  Number from 0 to 1 reflecting how sure you are that this is a real, committed work item.
+  Prefer precision: omit uncertain commitments rather than emitting low-confidence junk.
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+MEETING ANALYSIS
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Always return a top-level meeting_analysis object:
+
+has_actionable_work
+  false when the meeting contains only greetings, status updates, off-topic chat,
+  brainstorming without commitment, or discussion that cannot map to any known
+  Jira project. When false, items MUST be an empty array.
+
+project_relevance_confidence
+  Number from 0 to 1 for how certain you are about that classification
+  (high for a clear social call with no work; lower when ambiguous).
+
+summary
+  One sentence explaining the classification.
+
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 OUTPUT SIZE
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
@@ -239,15 +307,22 @@ Prefer the minimum number of Jira cards needed.
 Typical meetings should produce between 1 and 5 work items.
 Only exceed this when the meeting clearly discussed many unrelated deliverables.
 If uncertain whether to merge or split, prefer merging.
-If no actionable work was agreed upon, return an empty items array.
+If no actionable work was agreed upon, return has_actionable_work: false and an empty items array.
 
 Your goal is quality over quantity.
 `;
+
+export interface ExtractionProjectContext {
+  key: string;
+  name: string;
+  aiContext: string;
+}
 
 export function buildItemExtractionUserPrompt(
   transcript: string,
   summaryOverview?: string,
   actionItems?: string[],
+  projects: ExtractionProjectContext[] = [],
 ): string {
   const summarySection = summaryOverview
     ? `\n\nMeeting summary:\n${summaryOverview}`
@@ -257,13 +332,29 @@ export function buildItemExtractionUserPrompt(
       ? `\n\nAction items from summary (group these into logical Jira cards — do NOT create one card per line):\n${actionItems.map((item) => `- ${item}`).join('\n')}`
       : '';
 
+  const projectSection =
+    projects.length > 0
+      ? `\n\nKnown Jira projects (pick suggested_project_key from these keys only):\n${projects
+          .map(
+            (project) =>
+              `- key: ${project.key} | name: ${project.name} | aiContext: ${project.aiContext}`,
+          )
+          .join('\n')}`
+      : '\n\nNo Jira projects were provided. Still extract items if work was committed; leave suggested_project_key as an empty string and set project_confidence low.';
+
   return `Extract Jira work items from this meeting.
 
 Rules:
-- Group related work into single cards.
-- Skip all off-topic conversation, status updates, greetings, and non-committed discussion.
+- Always include meeting_analysis.
+- Extract only genuine action items with clear post-meeting intent — not status updates, progress reports, or observations.
+- Do not infer tasks from descriptions of current state or completed work.
+- Group related work into single cards within the same project.
+- When a meeting spans multiple projects, assign each item to one project only — never merge cross-project work into one card.
+- Skip all off-topic conversation, greetings, and non-committed discussion.
 - Do not create cards for topics unrelated to deliverable work.
-- If nothing actionable was committed to, return an empty items array.${summarySection}${actionSection}
+- When project context is unclear, still extract if work was committed, pick the closest project, set project_confidence low.
+- Prefer precision: omit uncertain commitments rather than low-confidence junk.
+- If nothing actionable was committed to, set has_actionable_work to false and return an empty items array.${projectSection}${summarySection}${actionSection}
 
 Transcript:
 ${transcript}`;

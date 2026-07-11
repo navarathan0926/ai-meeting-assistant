@@ -9,6 +9,7 @@ import { TranscriptionsService } from '../transcriptions/transcriptions.service'
 import { SummariesService } from '../summaries/summaries.service';
 import { BlobStorageService } from '../storage/blob-storage.service';
 import { ExtractionService } from '../extraction/extraction.service';
+import { extractionConfiguration } from '../common/config/extraction.config';
 
 const USER_ID = 'user-uuid-1';
 const OTHER_USER_ID = 'user-uuid-2';
@@ -98,6 +99,14 @@ describe('MeetingsService', () => {
           provide: ExtractionService,
           useValue: {
             addExtractJob: jest.fn().mockResolvedValue('job-id-123'),
+          },
+        },
+        {
+          provide: extractionConfiguration.KEY,
+          useValue: {
+            extractionConfidenceThreshold: 0.6,
+            projectConfidenceThreshold: 0.6,
+            meetingRelevanceThreshold: 0.7,
           },
         },
       ],

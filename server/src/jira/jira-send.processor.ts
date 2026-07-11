@@ -52,10 +52,19 @@ export class JiraSendProcessor extends WorkerHost {
         title: item.title,
         description: item.description,
         priority: item.priority,
+        projectKey:
+          item.finalProjectKey ??
+          item.suggestedProjectKey ??
+          undefined,
       });
 
       item.jiraIssueKey = result.issueKey;
       item.status = ExtractedItemStatus.Sent;
+      if (!item.finalProjectKey) {
+        item.finalProjectKey =
+          item.suggestedProjectKey ??
+          this.jiraService.getFallbackProjectKey();
+      }
       await this.extractedItemRepository.save(item);
       this.logger.log(`Jira issue ${result.issueKey} created for item ${itemId}`);
     } catch (error) {

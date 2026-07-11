@@ -29,6 +29,7 @@ export const defaultJiraConfig = (): JiraConfig => ({
   email: 'user@example.com',
   projectKey: 'PROJ',
   baseUrl: 'https://example.atlassian.net',
+  projectsCacheTtlSeconds: 3600,
 });
 
 export const defaultAzureStorageConfig = (): AzureStorageConfig => ({

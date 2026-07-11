@@ -29,6 +29,9 @@ function buildItem(overrides: Partial<RawExtractedItem> = {}): RawExtractedItem 
     priority: 'high',
     context_snippet: 'We noticed login fails on iOS.',
     scope: 'mobile-login-bug',
+    suggested_project_key: 'PROJ',
+    project_confidence: 0.9,
+    extraction_confidence: 0.85,
     ...overrides,
   };
 }

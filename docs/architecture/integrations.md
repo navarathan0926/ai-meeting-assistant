@@ -69,10 +69,13 @@ AZURE_STORAGE_CONTAINER_NAME=uploads
 ## Jira (Phases 8–13)
 
 ### Purpose
-Create, search, and update issues in a Jira project from extracted meeting items.
+Create, search, and update issues in Jira from extracted meeting items.
+Phase 9 supports multiple projects on one Jira account: extraction suggests a
+project per item, reviewers can override, and create uses per-project createmeta.
 
 ### API
-Jira Cloud REST API v3: `https://<domain>.atlassian.net/rest/api/3/`
+Atlassian API gateway (Phase 8+): `JIRA_API_GATEWAY_URL` + `CLOUD_ID`
+→ `https://api.atlassian.com/ex/jira/{cloudId}/rest/api/3/...`
 
 ### Authentication
 Two options:
@@ -83,21 +86,33 @@ Store as: `jira_email` + `jira_api_token` encrypted in `integration_credentials`
 (Phase 11+) or as env vars (Phases 8–10 single-account mode).
 
 ```
-JIRA_BASE_URL=https://yourcompany.atlassian.net
+JIRA_API_GATEWAY_URL=https://api.atlassian.com/ex/jira
+CLOUD_ID=...
 JIRA_EMAIL=admin@yourcompany.com
-JIRA_API_TOKEN=...
-JIRA_PROJECT_KEY=PROJ
+JIRA_API_KEY=...
+JIRA_PROJECT_KEY=PROJ   # optional fallback when no item project is set
+JIRA_BASE_URL=https://yourcompany.atlassian.net  # browse links only
 ```
+
+Project list + createmeta responses are cached in Redis
+(`JIRA_PROJECTS_CACHE_TTL_SECONDS`, createmeta TTL 30m).
 
 ### Key Endpoints Used
 
 | Endpoint | Purpose |
 |----------|---------|
-| `GET /rest/api/3/project/search` | Fetch available projects |
+| `GET /rest/api/3/project/search` | Fetch available projects (Phase 9) |
 | `POST /rest/api/3/issue` | Create a new issue |
 | `GET /rest/api/3/issue/createmeta` | Validate allowed issue types per project |
 | `GET /rest/api/3/search` (JQL) | Search for existing issues (Phase 13) |
 | `POST /rest/api/3/issue/{key}/comment` | Add comment to existing issue |
+
+### App API (Phase 9)
+
+| Endpoint | Purpose |
+|----------|---------|
+| `GET /api/jira/projects` | Cached projects + merged `aiContext` |
+| `PUT /api/jira/projects/:key/context` | Save `project_contexts.aiContext` |
 
 ### Issue Type Mapping
 ```typescript
@@ -105,7 +120,7 @@ const typeMap = {
   bug:     'Bug',
   task:    'Task',
   story:   'Story',
-  feature: 'Epic', // or 'New Feature' — verify via createmeta per project
+  feature: 'Story', // createmeta fallback if preferred type missing
 };
 ```
 Always validate against `createmeta` per project rather than assuming fixed types.

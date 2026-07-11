@@ -14,9 +14,19 @@ export interface RawExtractedItem {
   priority: string;
   context_snippet: string;
   scope: string;
+  suggested_project_key: string;
+  project_confidence: number;
+  extraction_confidence: number;
+}
+
+export interface RawMeetingAnalysis {
+  has_actionable_work: boolean;
+  project_relevance_confidence: number;
+  summary: string;
 }
 
 export interface ItemExtractionOutput {
+  meeting_analysis: RawMeetingAnalysis;
   items: RawExtractedItem[];
 }
 
@@ -49,6 +59,20 @@ export const ITEM_EXTRACTION_JSON_SCHEMA = {
   schema: {
     type: 'object',
     properties: {
+      meeting_analysis: {
+        type: 'object',
+        properties: {
+          has_actionable_work: { type: 'boolean' },
+          project_relevance_confidence: { type: 'number' },
+          summary: { type: 'string' },
+        },
+        required: [
+          'has_actionable_work',
+          'project_relevance_confidence',
+          'summary',
+        ],
+        additionalProperties: false,
+      },
       items: {
         type: 'array',
         items: {
@@ -73,6 +97,21 @@ export const ITEM_EXTRACTION_JSON_SCHEMA = {
               description:
                 'Stable kebab-case identifier for the logical work item. Same scope = same Jira card theme.',
             },
+            suggested_project_key: {
+              type: 'string',
+              description:
+                'Jira project key from the provided project list only.',
+            },
+            project_confidence: {
+              type: 'number',
+              description:
+                'Confidence 0–1 that suggested_project_key is correct.',
+            },
+            extraction_confidence: {
+              type: 'number',
+              description:
+                'Confidence 0–1 that this is a real committed work item.',
+            },
           },
           required: [
             'type',
@@ -81,12 +120,15 @@ export const ITEM_EXTRACTION_JSON_SCHEMA = {
             'priority',
             'context_snippet',
             'scope',
+            'suggested_project_key',
+            'project_confidence',
+            'extraction_confidence',
           ],
           additionalProperties: false,
         },
       },
     },
-    required: ['items'],
+    required: ['meeting_analysis', 'items'],
     additionalProperties: false,
   },
 } as const;
@@ -403,6 +445,11 @@ function mergeItems(
     secondary.title,
   );
 
+  const { suggested_project_key, project_confidence } = pickProjectFields(
+    primary,
+    secondary,
+  );
+
   return {
     type,
     title: primary.title,
@@ -413,7 +460,51 @@ function mergeItems(
       secondary.context_snippet,
     ),
     priority,
+    suggested_project_key,
+    project_confidence,
+    extraction_confidence: Math.max(
+      clampConfidence(primary.extraction_confidence),
+      clampConfidence(secondary.extraction_confidence),
+    ),
   };
+}
+
+function pickProjectFields(
+  primary: RawExtractedItem,
+  secondary: RawExtractedItem,
+): { suggested_project_key: string; project_confidence: number } {
+  const primaryConfidence = clampConfidence(primary.project_confidence);
+  const secondaryConfidence = clampConfidence(secondary.project_confidence);
+
+  if (
+    primary.suggested_project_key &&
+    secondary.suggested_project_key &&
+    primary.suggested_project_key !== secondary.suggested_project_key
+  ) {
+    if (secondaryConfidence > primaryConfidence) {
+      return {
+        suggested_project_key: secondary.suggested_project_key,
+        project_confidence: secondaryConfidence,
+      };
+    }
+    return {
+      suggested_project_key: primary.suggested_project_key,
+      project_confidence: primaryConfidence,
+    };
+  }
+
+  return {
+    suggested_project_key:
+      primary.suggested_project_key || secondary.suggested_project_key || '',
+    project_confidence: Math.max(primaryConfidence, secondaryConfidence),
+  };
+}
+
+function clampConfidence(value: number | undefined): number {
+  if (typeof value !== 'number' || !Number.isFinite(value)) {
+    return 0;
+  }
+  return Math.min(1, Math.max(0, value));
 }
 
 /** Round-trip ADF back to raw blocks for storage consistency. */

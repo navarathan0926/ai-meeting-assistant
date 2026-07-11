@@ -10,13 +10,16 @@ import {
   normalizeExtractedItemDescription,
   UpdateExtractedItemPayload,
 } from '@/types/extracted-item';
+import { ExtractionAnalysis, MeetingStatus } from '@/types/meeting';
 import {
   useApproveExtractedItem,
   useExtractedItems,
   useRejectExtractedItem,
   useUpdateExtractedItem,
 } from '@/hooks/useExtractedItems';
+import { useJiraProjects } from '@/hooks/useJiraProjects';
 import { ConfirmationModal } from '@/components/common/ConfirmationModal';
+import { ProjectSelector } from '@/components/extracted-items/ProjectSelector';
 import { JiraDocumentRenderer } from '@/lib/jira-document/JiraDocumentRenderer';
 import { JiraAdfDocument } from '@/lib/jira-document/types';
 
@@ -35,12 +38,19 @@ const RichDescriptionEditor = dynamic(
 
 interface ExtractedItemsReviewProps {
   meetingId: string;
+  meetingStatus?: MeetingStatus;
+  extractionAnalysis?: ExtractionAnalysis | null;
 }
 
 type PendingAction = 'approve' | 'reject';
 
-export function ExtractedItemsReview({ meetingId }: ExtractedItemsReviewProps) {
+export function ExtractedItemsReview({
+  meetingId,
+  meetingStatus,
+  extractionAnalysis,
+}: ExtractedItemsReviewProps) {
   const { data: items, isLoading, isFetching } = useExtractedItems(meetingId);
+  const { data: projects = [] } = useJiraProjects();
 
   if (isLoading || (isFetching && !items)) {
     return (
@@ -51,17 +61,12 @@ export function ExtractedItemsReview({ meetingId }: ExtractedItemsReviewProps) {
     );
   }
 
-  if (!items || items.length === 0) {
-    return (
-      <section className="rounded-2xl border border-white/10 bg-white/5 p-5">
-        <SectionTitle icon="🎯" title="Extracted Items" />
-        <p className="mt-3 text-sm text-white/50">
-          No actionable items were extracted from this meeting yet. They may still
-          be processing.
-        </p>
-      </section>
-    );
-  }
+  const hasItems = Boolean(items && items.length > 0);
+  const analysisComplete = Boolean(extractionAnalysis);
+  const stillProcessing =
+    !hasItems &&
+    !analysisComplete &&
+    meetingStatus === MeetingStatus.Completed;
 
   return (
     <section className="rounded-2xl border border-white/10 bg-white/5 p-5">
@@ -69,21 +74,98 @@ export function ExtractedItemsReview({ meetingId }: ExtractedItemsReviewProps) {
       <p className="mt-2 text-xs text-white/40">
         Review, edit, and approve items before sending them to Jira.
       </p>
-      <div className="mt-4 flex flex-col gap-4">
-        {items.map((item) => (
-          <ExtractedItemCard key={item.id} item={item} meetingId={meetingId} />
-        ))}
-      </div>
+
+      <MeetingAnalysisBanner analysis={extractionAnalysis ?? null} />
+
+      {!hasItems ? (
+        <EmptyExtractionState
+          stillProcessing={stillProcessing}
+          analysis={extractionAnalysis ?? null}
+        />
+      ) : (
+        <div className="mt-4 flex flex-col gap-4">
+          {items!.map((item) => (
+            <ExtractedItemCard
+              key={item.id}
+              item={item}
+              meetingId={meetingId}
+              projects={projects}
+            />
+          ))}
+        </div>
+      )}
     </section>
+  );
+}
+
+function MeetingAnalysisBanner({
+  analysis,
+}: {
+  analysis: ExtractionAnalysis | null;
+}) {
+  if (!analysis) {
+    return null;
+  }
+
+  if (analysis.showNoWorkBanner) {
+    return (
+      <div className="mt-4 rounded-lg border border-white/15 bg-white/5 px-3 py-2 text-sm text-white/70">
+        No project-relevant work was found in this meeting.
+        <p className="mt-1 text-xs text-white/45">{analysis.summary}</p>
+      </div>
+    );
+  }
+
+  if (analysis.showLowRelevanceWarning) {
+    return (
+      <div className="mt-4 rounded-lg border border-amber-400/40 bg-amber-900/20 px-3 py-2 text-sm text-amber-100">
+        Extraction confidence is low; review carefully or re-run.
+        <p className="mt-1 text-xs text-amber-100/70">{analysis.summary}</p>
+      </div>
+    );
+  }
+
+  return null;
+}
+
+function EmptyExtractionState({
+  stillProcessing,
+  analysis,
+}: {
+  stillProcessing: boolean;
+  analysis: ExtractionAnalysis | null;
+}) {
+  if (stillProcessing) {
+    return (
+      <p className="mt-3 text-sm text-white/50">
+        Extraction is still processing. Items will appear here when ready.
+      </p>
+    );
+  }
+
+  if (analysis && analysis.hasActionableWork === false) {
+    return (
+      <p className="mt-3 text-sm text-white/50">
+        Extraction complete — no actionable Jira items were found.
+      </p>
+    );
+  }
+
+  return (
+    <p className="mt-3 text-sm text-white/50">
+      No actionable items were extracted from this meeting.
+    </p>
   );
 }
 
 function ExtractedItemCard({
   item,
   meetingId,
+  projects,
 }: {
   item: ExtractedItem;
   meetingId: string;
+  projects: ReturnType<typeof useJiraProjects>['data'];
 }) {
   const updateMutation = useUpdateExtractedItem(meetingId);
   const rejectMutation = useRejectExtractedItem(meetingId);
@@ -94,6 +176,7 @@ function ExtractedItemCard({
     title: item.title,
     description: normalizeExtractedItemDescription(item.description),
     priority: item.priority,
+    projectKey: item.finalProjectKey ?? item.suggestedProjectKey ?? '',
   });
   const [isEditingDescription, setIsEditingDescription] = useState(false);
   const [pendingAction, setPendingAction] = useState<PendingAction | null>(null);
@@ -104,15 +187,25 @@ function ExtractedItemCard({
       title: item.title,
       description: normalizeExtractedItemDescription(item.description),
       priority: item.priority,
+      projectKey: item.finalProjectKey ?? item.suggestedProjectKey ?? '',
     });
     setIsEditingDescription(false);
-  }, [item.id, item.updatedAt, item.type, item.title, item.priority]);
+  }, [
+    item.id,
+    item.updatedAt,
+    item.type,
+    item.title,
+    item.priority,
+    item.finalProjectKey,
+    item.suggestedProjectKey,
+  ]);
 
   const isEditable = item.status === ExtractedItemStatus.Draft;
   const isBusy =
     updateMutation.isPending ||
     rejectMutation.isPending ||
     approveMutation.isPending;
+  const projectList = projects ?? [];
 
   const handleSave = () => {
     const payload: UpdateExtractedItemPayload = {};
@@ -120,11 +213,31 @@ function ExtractedItemCard({
     if (draft.title !== item.title) payload.title = draft.title;
     if (draft.priority !== item.priority) payload.priority = draft.priority;
 
+    const currentProject = item.finalProjectKey ?? item.suggestedProjectKey ?? '';
+    if (draft.projectKey && draft.projectKey !== currentProject) {
+      payload.finalProjectKey = draft.projectKey;
+    }
+
     if (Object.keys(payload).length === 0) {
       return;
     }
 
     updateMutation.mutate({ id: item.id, payload });
+  };
+
+  const handleProjectChange = (projectKey: string) => {
+    setDraft((prev) => ({ ...prev, projectKey }));
+    if (!isEditable || !projectKey) {
+      return;
+    }
+    const currentProject = item.finalProjectKey ?? item.suggestedProjectKey ?? '';
+    if (projectKey === currentProject || projectKey === item.finalProjectKey) {
+      return;
+    }
+    updateMutation.mutate({
+      id: item.id,
+      payload: { finalProjectKey: projectKey },
+    });
   };
 
   const handleDescriptionSave = (description: JiraAdfDocument) => {
@@ -177,7 +290,8 @@ function ExtractedItemCard({
           title: 'Send to Jira',
           message: (
             <>
-              Approve &ldquo;{item.title}&rdquo; and create a Jira issue with the
+              Approve &ldquo;{item.title}&rdquo; and create a Jira issue
+              {draft.projectKey ? ` in ${draft.projectKey}` : ''} with the
               current details?
             </>
           ),
@@ -208,6 +322,26 @@ function ExtractedItemCard({
         <StatusBadge status={item.status} />
         {item.jiraIssueKey && (
           <JiraLink issueKey={item.jiraIssueKey} url={item.jiraIssueUrl} />
+        )}
+        <ConfidenceBadge
+          label="Project match"
+          value={item.projectConfidence}
+          warn={item.needsProjectReview}
+        />
+        <ConfidenceBadge
+          label="Extraction confidence"
+          value={item.extractionConfidence}
+          warn={item.lowExtractionConfidence}
+        />
+        {item.needsProjectReview && isEditable && (
+          <span className="rounded-full bg-amber-500/20 px-2 py-0.5 text-xs text-amber-200">
+            Select project
+          </span>
+        )}
+        {item.lowExtractionConfidence && (
+          <span className="rounded-full bg-amber-500/20 px-2 py-0.5 text-xs text-amber-200">
+            Review carefully
+          </span>
         )}
       </div>
 
@@ -250,6 +384,14 @@ function ExtractedItemCard({
             className="rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-sm text-white disabled:opacity-50"
           />
         </label>
+
+        <ProjectSelector
+          projects={projectList}
+          value={draft.projectKey}
+          disabled={!isEditable || isBusy}
+          needsAttention={item.needsProjectReview && isEditable}
+          onChange={handleProjectChange}
+        />
 
         <div className="flex flex-col gap-2">
           <div className="flex items-center justify-between">
@@ -357,6 +499,32 @@ function ExtractedItemCard({
         />
       )}
     </article>
+  );
+}
+
+function ConfidenceBadge({
+  label,
+  value,
+  warn,
+}: {
+  label: string;
+  value: number | null;
+  warn: boolean;
+}) {
+  if (value === null || value === undefined) {
+    return null;
+  }
+  const pct = Math.round(value * 100);
+  return (
+    <span
+      className={`rounded-full px-2 py-0.5 text-xs ${
+        warn
+          ? 'bg-amber-500/20 text-amber-200'
+          : 'bg-emerald-500/20 text-emerald-200'
+      }`}
+    >
+      {label} {pct}%
+    </span>
   );
 }
 

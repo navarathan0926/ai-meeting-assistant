@@ -24,6 +24,12 @@ export default function DashboardPage() {
           <h1 className="font-bold text-lg tracking-tight">AI Meeting Assistant</h1>
         </Link>
         <div className="ml-auto flex items-center gap-4">
+          <Link
+            href="/settings"
+            className="text-xs text-white/60 hover:text-white transition-colors"
+          >
+            Settings
+          </Link>
           <span className="text-xs text-white/50 font-mono hidden sm:inline">
             Signed in as <span className="text-[#39FF14]">{user?.name}</span>
           </span>
@@ -74,7 +80,11 @@ export default function DashboardPage() {
                 </h2>
                 <MeetingResults meeting={activeMeeting} />
                 {activeMeeting.status === MeetingStatus.Completed && (
-                  <ExtractedItemsReview meetingId={activeMeeting.id} />
+                  <ExtractedItemsReview
+                    meetingId={activeMeeting.id}
+                    meetingStatus={activeMeeting.status}
+                    extractionAnalysis={activeMeeting.extractionAnalysis}
+                  />
                 )}
               </section>
             )}

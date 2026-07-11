@@ -1,14 +1,26 @@
 import { registerAs } from '@nestjs/config';
 import { EnvKey } from './env.keys';
-import { normalizeBaseUrl, readEnv, requireEnv } from './env.helpers';
+import { normalizeBaseUrl, readEnv } from './env.helpers';
 
 export interface JiraConfig {
   apiGatewayUrl: string;
   cloudId: string;
   apiKey: string;
   email: string;
+  /** Optional fallback when AI/reviewer do not supply a project key. */
   projectKey: string;
   baseUrl: string | null;
+  projectsCacheTtlSeconds: number;
+}
+
+const DEFAULT_PROJECTS_CACHE_TTL_SECONDS = 3600;
+
+function parsePositiveInt(value: string | undefined, fallback: number): number {
+  if (!value) {
+    return fallback;
+  }
+  const parsed = Number.parseInt(value, 10);
+  return Number.isFinite(parsed) && parsed > 0 ? parsed : fallback;
 }
 
 export function buildJiraConfig(
@@ -21,13 +33,16 @@ export function buildJiraConfig(
     email: readEnv(source, EnvKey.JiraEmail) ?? '',
     projectKey: readEnv(source, EnvKey.JiraProjectKey) ?? '',
     baseUrl: readEnv(source, EnvKey.JiraBaseUrl) ?? null,
+    projectsCacheTtlSeconds: parsePositiveInt(
+      readEnv(source, EnvKey.JiraProjectsCacheTtlSeconds),
+      DEFAULT_PROJECTS_CACHE_TTL_SECONDS,
+    ),
   };
 }
 
+/** Credentials required to call Jira APIs (project key is optional fallback). */
 export function isJiraConfigured(config: JiraConfig): boolean {
-  return Boolean(
-    config.cloudId && config.apiKey && config.email && config.projectKey,
-  );
+  return Boolean(config.cloudId && config.apiKey && config.email);
 }
 
 export function requireJiraApiGatewayUrl(config: JiraConfig): string {
@@ -48,7 +63,7 @@ export function requireJiraCredentials(config: JiraConfig): {
 } {
   if (!isJiraConfigured(config)) {
     throw new Error(
-      `Jira integration is not configured. Set ${EnvKey.CloudId}, ${EnvKey.JiraApiKey}, ${EnvKey.JiraEmail}, and ${EnvKey.JiraProjectKey}.`,
+      `Jira integration is not configured. Set ${EnvKey.CloudId}, ${EnvKey.JiraApiKey}, and ${EnvKey.JiraEmail}.`,
     );
   }
 

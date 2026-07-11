@@ -6,7 +6,9 @@ import { Repository } from 'typeorm';
 import OpenAI from 'openai';
 import { ConfigType } from '@nestjs/config';
 import { openAiConfiguration } from '../common/config/openai.config';
+import { extractionConfiguration } from '../common/config/extraction.config';
 import { Meeting } from '../meetings/entities/meeting.entity';
+import { ExtractionAnalysis } from '../meetings/interfaces/extraction-analysis.interface';
 import { ExtractedItem } from './entities/extracted-item.entity';
 import { ExtractedItemType } from './enums/extracted-item-type.enum';
 import { ExtractedItemPriority } from './enums/extracted-item-priority.enum';
@@ -15,13 +17,16 @@ import {
   consolidateExtractedItems,
   ITEM_EXTRACTION_JSON_SCHEMA,
   ItemExtractionOutput,
-  RawExtractedItem,
+  RawMeetingAnalysis,
 } from './item-extraction.schema';
 import { rawBlocksToAdf } from '../common/jira-document/merge-jira-documents';
 import {
   buildItemExtractionUserPrompt,
+  ExtractionProjectContext,
   ITEM_EXTRACTION_SYSTEM_PROMPT,
 } from './item-extraction.prompt';
+import { JiraService } from '../jira/jira.service';
+import { buildExtractionAnalysisFlags } from '../meetings/extraction-analysis.util';
 
 interface ItemExtractionJobData {
   meetingId: string;
@@ -40,6 +45,9 @@ export class ItemExtractionProcessor extends WorkerHost {
     private readonly extractedItemRepository: Repository<ExtractedItem>,
     @Inject(openAiConfiguration.KEY)
     openAiConfig: ConfigType<typeof openAiConfiguration>,
+    @Inject(extractionConfiguration.KEY)
+    private readonly extractionConfig: ConfigType<typeof extractionConfiguration>,
+    private readonly jiraService: JiraService,
   ) {
     super();
     this.extractionModel = openAiConfig.extractionModel;
@@ -75,6 +83,13 @@ export class ItemExtractionProcessor extends WorkerHost {
       return;
     }
 
+    if (meeting.extractionAnalysis) {
+      this.logger.log(
+        `Meeting ${meetingId} already has extraction analysis — skipping duplicate extraction.`,
+      );
+      return;
+    }
+
     const existingCount = await this.extractedItemRepository.count({
       where: { meetingId },
     });
@@ -85,20 +100,31 @@ export class ItemExtractionProcessor extends WorkerHost {
       return;
     }
 
-    const rawItems = await this.extractItemsFromContent(
+    const projects = await this.jiraService.getProjectsForExtraction();
+
+    const extraction = await this.extractItemsFromContent(
       meeting.transcription.text,
       meeting.summary?.overview,
       meeting.summary?.actionItems,
+      projects,
     );
 
-    const dedupedItems = consolidateExtractedItems(rawItems);
+    const analysis = this.toExtractionAnalysis(extraction.meeting_analysis);
+    const rawItems =
+      analysis.hasActionableWork === false
+        ? []
+        : consolidateExtractedItems(extraction.items);
 
     this.logger.log(
-      `Consolidated ${rawItems.length} raw extraction(s) → ${dedupedItems.length} Jira card(s) for meeting ${meetingId}.`,
+      `Consolidated ${extraction.items.length} raw extraction(s) → ${rawItems.length} Jira card(s) for meeting ${meetingId}.`,
     );
 
-    if (dedupedItems.length === 0) {
-      this.logger.log(`No actionable items found for meeting ${meetingId}.`);
+    if (rawItems.length === 0) {
+      meeting.extractionAnalysis = analysis;
+      await this.meetingRepository.save(meeting);
+      this.logger.log(
+        `No actionable items found for meeting ${meetingId}: ${analysis.summary}`,
+      );
       return;
     }
 
@@ -112,8 +138,13 @@ export class ItemExtractionProcessor extends WorkerHost {
       return;
     }
 
-    const entities = dedupedItems.map((item) =>
-      this.extractedItemRepository.create({
+    const entities = rawItems.map((item) => {
+      const suggestedProjectKey = this.resolveSuggestedProjectKey(
+        item.suggested_project_key,
+        projects,
+      );
+
+      return this.extractedItemRepository.create({
         meetingId,
         type: this.parseType(item.type),
         title: item.title.trim(),
@@ -121,10 +152,16 @@ export class ItemExtractionProcessor extends WorkerHost {
         priority: this.parsePriority(item.priority),
         contextSnippet: item.context_snippet?.trim() || null,
         status: ExtractedItemStatus.Draft,
-      }),
-    );
+        suggestedProjectKey,
+        projectConfidence: this.clampConfidence(item.project_confidence),
+        extractionConfidence: this.clampConfidence(item.extraction_confidence),
+        finalProjectKey: null,
+      });
+    });
 
     await this.extractedItemRepository.save(entities);
+    meeting.extractionAnalysis = analysis;
+    await this.meetingRepository.save(meeting);
     this.logger.log(
       `Saved ${entities.length} extracted item(s) for meeting ${meetingId}.`,
     );
@@ -132,9 +169,10 @@ export class ItemExtractionProcessor extends WorkerHost {
 
   private async extractItemsFromContent(
     transcript: string,
-    summaryOverview?: string,
-    actionItems?: string[],
-  ): Promise<RawExtractedItem[]> {
+    summaryOverview: string | undefined,
+    actionItems: string[] | undefined,
+    projects: ExtractionProjectContext[],
+  ): Promise<ItemExtractionOutput> {
     const completion = await this.openai.chat.completions.create({
       model: this.extractionModel,
       response_format: {
@@ -149,6 +187,7 @@ export class ItemExtractionProcessor extends WorkerHost {
             transcript,
             summaryOverview,
             actionItems,
+            projects,
           ),
         },
       ],
@@ -161,8 +200,10 @@ export class ItemExtractionProcessor extends WorkerHost {
     }
 
     const parsed = JSON.parse(raw) as ItemExtractionOutput;
-    if (!Array.isArray(parsed.items)) {
-      throw new Error('OpenAI extraction response does not match expected schema.');
+    if (!parsed.meeting_analysis || !Array.isArray(parsed.items)) {
+      throw new Error(
+        'Extraction response does not match expected schema.',
+      );
     }
 
     if (completion.usage) {
@@ -171,7 +212,61 @@ export class ItemExtractionProcessor extends WorkerHost {
       );
     }
 
-    return parsed.items;
+    return parsed;
+  }
+
+  private toExtractionAnalysis(
+    analysis: RawMeetingAnalysis,
+  ): ExtractionAnalysis {
+    const hasActionableWork = Boolean(analysis.has_actionable_work);
+    const projectRelevanceConfidence = this.clampConfidence(
+      analysis.project_relevance_confidence,
+    );
+    const meetingRelevanceThreshold =
+      this.extractionConfig.meetingRelevanceThreshold;
+    const flags = buildExtractionAnalysisFlags(
+      { hasActionableWork, projectRelevanceConfidence },
+      meetingRelevanceThreshold,
+    );
+
+    return {
+      hasActionableWork,
+      projectRelevanceConfidence,
+      summary: analysis.summary?.trim() || 'No extraction summary provided.',
+      extractedAt: new Date().toISOString(),
+      meetingRelevanceThreshold,
+      ...flags,
+    };
+  }
+
+  private resolveSuggestedProjectKey(
+    rawKey: string | undefined,
+    projects: ExtractionProjectContext[],
+  ): string | null {
+    const key = rawKey?.trim();
+    if (!key) {
+      return null;
+    }
+    if (projects.length === 0) {
+      return key;
+    }
+    const match = projects.find(
+      (project) => project.key.toUpperCase() === key.toUpperCase(),
+    );
+    if (!match) {
+      this.logger.warn(
+        `Model suggested unknown project key "${key}" — clearing suggestion.`,
+      );
+      return null;
+    }
+    return match.key;
+  }
+
+  private clampConfidence(value: number | undefined): number {
+    if (typeof value !== 'number' || !Number.isFinite(value)) {
+      return 0;
+    }
+    return Math.min(1, Math.max(0, value));
   }
 
   private parseType(value: string): ExtractedItemType {

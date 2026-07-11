@@ -3,6 +3,7 @@ import { render, screen, fireEvent } from '@testing-library/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { ExtractedItemsReview } from './ExtractedItemsReview';
 import {
+  ExtractedItem,
   ExtractedItemPriority,
   ExtractedItemStatus,
   ExtractedItemType,
@@ -58,6 +59,13 @@ jest.mock('@/hooks/useExtractedItems', () => ({
   })),
 }));
 
+jest.mock('@/hooks/useJiraProjects', () => ({
+  useJiraProjects: jest.fn(() => ({
+    data: [{ key: 'PROJ', name: 'Project', description: '', aiContext: 'Main' }],
+    isLoading: false,
+  })),
+}));
+
 import {
   useExtractedItems,
   useApproveExtractedItem,
@@ -74,6 +82,30 @@ const sampleDescription = blocksToAdf([
   { type: 'heading', level: 2, text: 'Context' },
   { type: 'paragraph', text: 'Users cannot log in.' },
 ]);
+
+function buildItem(overrides: Partial<ExtractedItem> = {}): ExtractedItem {
+  return {
+    id: 'item-1',
+    meetingId: 'meeting-1',
+    type: ExtractedItemType.Bug,
+    title: 'Fix login bug',
+    description: sampleDescription,
+    priority: ExtractedItemPriority.High,
+    contextSnippet: null,
+    status: ExtractedItemStatus.Draft,
+    jiraIssueKey: null,
+    jiraIssueUrl: null,
+    suggestedProjectKey: 'PROJ',
+    projectConfidence: 0.9,
+    extractionConfidence: 0.85,
+    finalProjectKey: null,
+    needsProjectReview: false,
+    lowExtractionConfidence: false,
+    createdAt: '2024-01-01T00:00:00.000Z',
+    updatedAt: '2024-01-01T00:00:00.000Z',
+    ...overrides,
+  };
+}
 
 function renderWithQuery(ui: React.ReactElement) {
   const client = new QueryClient({
@@ -117,22 +149,7 @@ describe('ExtractedItemsReview', () => {
 
   it('should render draft items with formatted description', () => {
     mockedUseExtractedItems.mockReturnValue({
-      data: [
-        {
-          id: 'item-1',
-          meetingId: 'meeting-1',
-          type: ExtractedItemType.Bug,
-          title: 'Fix login bug',
-          description: sampleDescription,
-          priority: ExtractedItemPriority.High,
-          contextSnippet: 'Discussed at 10:05',
-          status: ExtractedItemStatus.Draft,
-          jiraIssueKey: null,
-          jiraIssueUrl: null,
-          createdAt: '2024-01-01T00:00:00.000Z',
-          updatedAt: '2024-01-01T00:00:00.000Z',
-        },
-      ],
+      data: [buildItem({ contextSnippet: 'Discussed at 10:05' })],
       isLoading: false,
       isFetching: false,
     });
@@ -152,20 +169,16 @@ describe('ExtractedItemsReview', () => {
   it('should render Jira issue link for sent items', () => {
     mockedUseExtractedItems.mockReturnValue({
       data: [
-        {
-          id: 'item-1',
-          meetingId: 'meeting-1',
+        buildItem({
           type: ExtractedItemType.Task,
           title: 'Ship feature',
           description: blocksToAdf([{ type: 'paragraph', text: 'Done' }]),
           priority: ExtractedItemPriority.Medium,
-          contextSnippet: null,
           status: ExtractedItemStatus.Sent,
           jiraIssueKey: 'PROJ-42',
           jiraIssueUrl: 'https://example.atlassian.net/browse/PROJ-42',
-          createdAt: '2024-01-01T00:00:00.000Z',
-          updatedAt: '2024-01-01T00:00:00.000Z',
-        },
+          finalProjectKey: 'PROJ',
+        }),
       ],
       isLoading: false,
       isFetching: false,
@@ -188,22 +201,7 @@ describe('ExtractedItemsReview', () => {
     });
 
     mockedUseExtractedItems.mockReturnValue({
-      data: [
-        {
-          id: 'item-1',
-          meetingId: 'meeting-1',
-          type: ExtractedItemType.Bug,
-          title: 'Fix login bug',
-          description: sampleDescription,
-          priority: ExtractedItemPriority.High,
-          contextSnippet: null,
-          status: ExtractedItemStatus.Draft,
-          jiraIssueKey: null,
-          jiraIssueUrl: null,
-          createdAt: '2024-01-01T00:00:00.000Z',
-          updatedAt: '2024-01-01T00:00:00.000Z',
-        },
-      ],
+      data: [buildItem()],
       isLoading: false,
       isFetching: false,
     });
@@ -232,22 +230,7 @@ describe('ExtractedItemsReview', () => {
     });
 
     mockedUseExtractedItems.mockReturnValue({
-      data: [
-        {
-          id: 'item-1',
-          meetingId: 'meeting-1',
-          type: ExtractedItemType.Bug,
-          title: 'Fix login bug',
-          description: sampleDescription,
-          priority: ExtractedItemPriority.High,
-          contextSnippet: null,
-          status: ExtractedItemStatus.Draft,
-          jiraIssueKey: null,
-          jiraIssueUrl: null,
-          createdAt: '2024-01-01T00:00:00.000Z',
-          updatedAt: '2024-01-01T00:00:00.000Z',
-        },
-      ],
+      data: [buildItem()],
       isLoading: false,
       isFetching: false,
     });
@@ -274,22 +257,7 @@ describe('ExtractedItemsReview', () => {
     });
 
     mockedUseExtractedItems.mockReturnValue({
-      data: [
-        {
-          id: 'item-1',
-          meetingId: 'meeting-1',
-          type: ExtractedItemType.Bug,
-          title: 'Fix login bug',
-          description: sampleDescription,
-          priority: ExtractedItemPriority.High,
-          contextSnippet: null,
-          status: ExtractedItemStatus.Draft,
-          jiraIssueKey: null,
-          jiraIssueUrl: null,
-          createdAt: '2024-01-01T00:00:00.000Z',
-          updatedAt: '2024-01-01T00:00:00.000Z',
-        },
-      ],
+      data: [buildItem()],
       isLoading: false,
       isFetching: false,
     });
@@ -322,22 +290,7 @@ describe('ExtractedItemsReview', () => {
     });
 
     mockedUseExtractedItems.mockReturnValue({
-      data: [
-        {
-          id: 'item-1',
-          meetingId: 'meeting-1',
-          type: ExtractedItemType.Bug,
-          title: 'Fix login bug',
-          description: sampleDescription,
-          priority: ExtractedItemPriority.High,
-          contextSnippet: null,
-          status: ExtractedItemStatus.Draft,
-          jiraIssueKey: null,
-          jiraIssueUrl: null,
-          createdAt: '2024-01-01T00:00:00.000Z',
-          updatedAt: '2024-01-01T00:00:00.000Z',
-        },
-      ],
+      data: [buildItem()],
       isLoading: false,
       isFetching: false,
     });

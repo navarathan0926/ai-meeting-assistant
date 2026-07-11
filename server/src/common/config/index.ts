@@ -5,6 +5,7 @@ import { databaseConfiguration } from './database.config';
 import { jiraConfiguration } from './jira.config';
 import { openAiConfiguration } from './openai.config';
 import { redisConfiguration } from './redis.config';
+import { extractionConfiguration } from './extraction.config';
 
 export { EnvKey } from './env.keys';
 export type { EnvKeyName } from './env.keys';
@@ -32,6 +33,11 @@ export {
   requireJiraCredentials,
   type JiraConfig,
 } from './jira.config';
+export {
+  extractionConfiguration,
+  buildExtractionConfig,
+  type ExtractionConfig,
+} from './extraction.config';
 export { openAiConfiguration, type OpenAiConfig } from './openai.config';
 export {
   redisConfiguration,
@@ -45,6 +51,7 @@ export const configurations = [
   databaseConfiguration,
   openAiConfiguration,
   jiraConfiguration,
+  extractionConfiguration,
   azureStorageConfiguration,
   authConfiguration,
   redisConfiguration,

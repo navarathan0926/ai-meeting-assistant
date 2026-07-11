@@ -129,6 +129,7 @@ versioned migration files.
 | `source` | enum | `upload` \| `zoom` — how the recording arrived |
 | `user_id` | uuid | FK → `users` |
 | `organization_id` | uuid | FK → `organizations` |
+| `extraction_analysis` | jsonb | Phase 9 meeting-level relevance result (nullable) |
 | `created_at` | timestamp | |
 
 ### `transcriptions`
@@ -164,13 +165,26 @@ versioned migration files.
 | `status` | enum | `draft` \| `approved` \| `rejected` \| `sent` |
 | `suggested_project_key` | varchar | AI-suggested task manager project key |
 | `project_confidence` | float | 0–1 confidence score for suggested project |
+| `extraction_confidence` | float | 0–1 confidence that the item is real committed work |
 | `final_project_key` | varchar | Reviewer-confirmed project key (nullable) |
-| `task_manager_issue_key` | varchar | Key from task manager after creation (e.g. `PROJ-42`) |
+| `jira_issue_key` | varchar | Jira issue key after creation (e.g. `PROJ-42`) — Phase 8/9 |
+| `jira_sync_error` | text | Last Jira send failure message (nullable) |
+| `task_manager_issue_key` | varchar | Generic key after Phase 17 adapter refactor |
 | `possible_duplicate_of` | varchar | Issue key of possible duplicate found via Phase 13 |
 | `duplicate_confidence` | float | Similarity score for the duplicate candidate |
 | `action_taken` | enum | `create_new` \| `update_existing` \| `none` |
 | `created_at` | timestamp | |
 | `updated_at` | timestamp | |
+
+### `project_contexts` (Phase 9)
+
+Editable AI routing blurbs per Jira project key (single-account mode). Moves under `organization_id` in Phase 11.
+
+| Column | Type | Notes |
+|--------|------|-------|
+| `projectKey` | varchar | PK — matches Jira project key |
+| `aiContext` | text | Short description injected into extraction prompts |
+| `updatedAt` | timestamptz | |
 
 ### `meeting_platform_connections`
 

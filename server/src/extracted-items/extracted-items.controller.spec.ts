@@ -55,6 +55,12 @@ describe('ExtractedItemsController', () => {
     status: ExtractedItemStatus.Draft,
     jiraIssueKey: null,
     jiraIssueUrl: null,
+    suggestedProjectKey: 'PROJ',
+    projectConfidence: 0.9,
+    extractionConfidence: 0.85,
+    finalProjectKey: null,
+    needsProjectReview: false,
+    lowExtractionConfidence: false,
     createdAt: new Date(),
     updatedAt: new Date(),
   };

@@ -28,7 +28,8 @@ class AtLeastOneExtractedItemFieldConstraint
       dto.type !== undefined ||
       dto.title !== undefined ||
       dto.description !== undefined ||
-      dto.priority !== undefined
+      dto.priority !== undefined ||
+      dto.finalProjectKey !== undefined
     );
   }
 
@@ -71,4 +72,9 @@ export class UpdateExtractedItemDto {
   @IsOptional()
   @IsEnum(ExtractedItemPriority)
   priority?: ExtractedItemPriority;
+
+  @IsOptional()
+  @IsString()
+  @MinLength(1)
+  finalProjectKey?: string;
 }
