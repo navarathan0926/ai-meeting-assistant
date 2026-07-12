@@ -40,6 +40,7 @@ const SAMPLE_MEETING: Meeting = {
   transcription: null,
   summary: null,
   extractedItems: [],
+  extractionAnalysis: null,
   createdAt: new Date('2024-01-01'),
   updatedAt: new Date('2024-01-01'),
 };
