@@ -3,9 +3,11 @@ import {
   Injectable,
   Logger,
   NotFoundException,
+  Inject,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
+import { ConfigType } from '@nestjs/config';
 import * as path from 'path';
 import { randomUUID } from 'crypto';
 import { Meeting } from './entities/meeting.entity';
@@ -15,6 +17,8 @@ import { TranscriptionsService } from '../transcriptions/transcriptions.service'
 import { SummariesService } from '../summaries/summaries.service';
 import { BlobStorageService } from '../storage/blob-storage.service';
 import { ExtractionService } from '../extraction/extraction.service';
+import { extractionConfiguration } from '../common/config/extraction.config';
+import { normalizeExtractionAnalysis } from './extraction-analysis.util';
 import type { Express } from 'express';
 
 const ALLOWED_MIME_TYPES = [
@@ -40,6 +44,8 @@ export class MeetingsService {
     private readonly summariesService: SummariesService,
     private readonly blobStorageService: BlobStorageService,
     private readonly extractionService: ExtractionService,
+    @Inject(extractionConfiguration.KEY)
+    private readonly extractionConfig: ConfigType<typeof extractionConfiguration>,
   ) {}
 
   async createFromUpload(
@@ -199,6 +205,10 @@ export class MeetingsService {
       summary: meeting.summary
         ? this.summariesService.toResponse(meeting.summary)
         : undefined,
+      extractionAnalysis: normalizeExtractionAnalysis(
+        meeting.extractionAnalysis,
+        this.extractionConfig.meetingRelevanceThreshold,
+      ),
       createdAt: meeting.createdAt,
       updatedAt: meeting.updatedAt,
     };

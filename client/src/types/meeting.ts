@@ -24,6 +24,16 @@ export interface Summary {
   createdAt: string;
 }
 
+export interface ExtractionAnalysis {
+  hasActionableWork: boolean;
+  projectRelevanceConfidence: number;
+  summary: string;
+  extractedAt: string;
+  meetingRelevanceThreshold?: number;
+  showNoWorkBanner?: boolean;
+  showLowRelevanceWarning?: boolean;
+}
+
 // ── Meeting ───────────────────────────────────────────────────────────────────
 
 export interface Meeting {
@@ -35,6 +45,7 @@ export interface Meeting {
   errorMessage?: string;
   transcription?: Transcription;
   summary?: Summary;
+  extractionAnalysis?: ExtractionAnalysis | null;
   createdAt: string;
   updatedAt: string;
 }

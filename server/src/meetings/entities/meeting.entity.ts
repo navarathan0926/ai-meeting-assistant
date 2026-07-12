@@ -14,6 +14,7 @@ import { Transcription } from '../../transcriptions/entities/transcription.entit
 import { Summary } from '../../summaries/entities/summary.entity';
 import { User } from '../../auth/entities/user.entity';
 import { ExtractedItem } from '../../extracted-items/entities/extracted-item.entity';
+import { ExtractionAnalysis } from '../interfaces/extraction-analysis.interface';
 
 @Entity('meetings')
 export class Meeting {
@@ -63,6 +64,9 @@ export class Meeting {
 
   @OneToMany(() => ExtractedItem, (item) => item.meeting)
   extractedItems: ExtractedItem[];
+
+  @Column({ type: 'jsonb', nullable: true })
+  extractionAnalysis: ExtractionAnalysis | null;
 
   @CreateDateColumn()
   createdAt: Date;

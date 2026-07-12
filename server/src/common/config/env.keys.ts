@@ -29,6 +29,12 @@ export const EnvKey = {
   JiraEmail: 'JIRA_EMAIL',
   JiraProjectKey: 'JIRA_PROJECT_KEY',
   JiraBaseUrl: 'JIRA_BASE_URL',
+  JiraProjectsCacheTtlSeconds: 'JIRA_PROJECTS_CACHE_TTL_SECONDS',
+
+  // Extraction confidence thresholds (Phase 9)
+  ExtractionConfidenceThreshold: 'EXTRACTION_CONFIDENCE_THRESHOLD',
+  ProjectConfidenceThreshold: 'PROJECT_CONFIDENCE_THRESHOLD',
+  MeetingRelevanceThreshold: 'MEETING_RELEVANCE_THRESHOLD',
 
   // Azure Blob Storage
   AzureStorageConnectionString: 'AZURE_STORAGE_CONNECTION_STRING',

@@ -8,8 +8,9 @@ import { useAuthContext } from '@/providers/AuthProvider';
 
 export const meetingKeys = {
   all: (userId: string, search?: string) =>
-    ['meetings', userId, search ?? ''] as const,
-  detail: (userId: string, id: string) => ['meetings', userId, id] as const,
+    ['meetings', userId, 'list', search ?? ''] as const,
+  detail: (userId: string, id: string) =>
+    ['meetings', userId, 'detail', id] as const,
 };
 
 export function useUploadMeeting() {
@@ -31,8 +32,13 @@ export function useMeeting(id: string | null) {
   const userId = user?.id ?? '';
 
   return useQuery<Meeting, Error>({
-    queryKey: meetingKeys.detail(userId, id ?? ''),
-    queryFn: () => meetingsApi.getById(id!),
+    queryKey: meetingKeys.detail(userId, id ?? '__none__'),
+    queryFn: () => {
+      if (!id) {
+        throw new Error('Meeting id is required.');
+      }
+      return meetingsApi.getById(id);
+    },
     enabled: !!id && !!userId,
     refetchInterval: (query) => {
       const status = query.state.data?.status;

@@ -4,16 +4,23 @@ import { MeetingStatus, Meeting } from '@/types/meeting';
 describe('meetingKeys', () => {
   const userId = 'user-abc';
 
-  it('should return a user-scoped base key for "all"', () => {
-    expect(meetingKeys.all(userId)).toEqual(['meetings', userId, '']);
+  it('should return a user-scoped list key for "all"', () => {
+    expect(meetingKeys.all(userId)).toEqual(['meetings', userId, 'list', '']);
   });
 
-  it('should return a user-scoped key for "detail"', () => {
+  it('should return a user-scoped detail key for "detail"', () => {
     expect(meetingKeys.detail(userId, 'abc-123')).toEqual([
       'meetings',
       userId,
+      'detail',
       'abc-123',
     ]);
+  });
+
+  it('should not collide list and detail keys when search is empty', () => {
+    expect(meetingKeys.all(userId, '')).not.toEqual(
+      meetingKeys.detail(userId, '__none__'),
+    );
   });
 });
 

@@ -26,15 +26,11 @@ the single hardcoded account from Phases 8 and 9.
   level (validation on user creation).
 
 ### 2. Organization entity expansion
-- Add columns to the organizations table: jira_base_url,
-  jira_auth_type (api_token or oauth, start with api_token),
-  jira_email, jira_api_token (store encrypted, do not store plain text,
-  use a proper encryption approach, check if the codebase already has a
-  secrets or encryption utility before adding a new one),
-  jira_project_mappings (jsonb, or a separate table if you prefer
-  relational, your call based on query needs), is_active, created_at.
-- Add a status field to allow SUPERADMIN to suspend an organization
-  without deleting data.
+- Organization entity: add jira_base_url, jira_auth_type (api_token first),
+  jira_email, jira_api_token (encrypted), is_active, status, created_at.
+- Project mappings / AI context: reuse Phase 9 `project_contexts`, add
+  `organizationId` (see section 7). Do not duplicate as a separate jsonb
+  blob unless you prefer it — table is fine.
 
 ### 3. OrganizationGuard
 - Add a guard, separate from RolesGuard, that checks the requested
@@ -62,11 +58,29 @@ the single hardcoded account from Phases 8 and 9.
   basic actions (suspend, view details).
 
 ### 6. Organization-scoped Jira configuration UI (for ADMIN)
-- A settings page, ADMIN only, where the org admin enters their Jira base
-  URL, email, and API token, and maps their Jira projects (reuse the
-  project fetch logic from Phase 9, but now scoped per organization).
+- Settings page (ADMIN only): Jira base URL, email, API token.
+- Fetch that org's Jira projects (Phase 9 `listProjects`, now using org
+  credentials).
+- Same page: edit `aiContext` per project (Phase 9 `project_contexts`, now
+  scoped by `organizationId`).
 
-### 7. Basic observability and cost tracking
+### 7. Project AI context → per organization
+
+Phase 9 stores `project_contexts` globally (one Jira account). Here:
+
+- Add `organizationId` FK to `project_contexts` (unique on
+  `(organizationId, projectKey)`).
+- Migrate existing rows onto the default organization.
+- Extraction for a meeting:
+  1. Read `meeting.organizationId`
+  2. Load that org's Jira credentials
+  3. Load that org's projects + `aiContext`
+  4. Inject only those into the prompt
+- Org A never sees Org B's projects or contexts.
+
+No per-meeting context config. Meeting → org → org's project contexts → prompt.
+
+### 8. Basic observability and cost tracking
 - Add a lightweight usage tracking mechanism, this does not need to be a
   separate monitoring stack, a new table or a set of counters is enough.
 - Track OpenAI token usage per organization, per meeting, both for the
@@ -90,11 +104,9 @@ the single hardcoded account from Phases 8 and 9.
 - Direct meeting platform integrations — that is Phase 12.
 
 ## Acceptance criteria
-- Two separate organizations can each configure their own Jira account
-  independently, and issues created for one organization never touch the
-  other organization's Jira instance.
-- A SUPERADMIN can view and manage all organizations from a dedicated
-  dashboard.
-- All existing meeting and extracted_item queries are correctly scoped by
-  organization, verified by testing with at least two organizations and
-  two separate users, confirming no data leaks across organizations.
+- Two orgs configure separate Jira accounts; issues never cross orgs.
+- Extraction for an org meeting only receives that org's projects +
+  `aiContext` in the prompt.
+- SUPERADMIN can manage all orgs from a dedicated dashboard.
+- Meeting / extracted_item queries scoped by organization — verified with
+  two orgs, two users, no data leaks.

@@ -15,6 +15,12 @@ export interface ExtractedItemResponse {
   jiraIssueKey: string | null;
   jiraIssueUrl: string | null;
   jiraSyncError?: string | null;
+  suggestedProjectKey: string | null;
+  projectConfidence: number | null;
+  extractionConfidence: number | null;
+  finalProjectKey: string | null;
+  needsProjectReview: boolean;
+  lowExtractionConfidence: boolean;
   createdAt: Date;
   updatedAt: Date;
 }

@@ -15,6 +15,7 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { blocksToAdf } from '../common/jira-document/blocks-to-adf';
+import { extractionConfiguration } from '../common/config/extraction.config';
 
 const sampleAdf = blocksToAdf([{ type: 'paragraph', text: 'Users cannot log in.' }]);
 
@@ -29,6 +30,11 @@ function buildItem(overrides: Partial<ExtractedItem> = {}): ExtractedItem {
   item.contextSnippet = 'Discussed at 10:05';
   item.status = ExtractedItemStatus.Draft;
   item.jiraIssueKey = null;
+  item.jiraSyncError = null;
+  item.suggestedProjectKey = 'PROJ';
+  item.projectConfidence = 0.9;
+  item.extractionConfidence = 0.85;
+  item.finalProjectKey = null;
   item.createdAt = new Date();
   item.updatedAt = new Date();
   return Object.assign(item, overrides);
@@ -66,12 +72,24 @@ describe('ExtractedItemsService', () => {
             createIssue: jest.fn(),
             getIssueBrowseUrl: jest.fn().mockReturnValue(null),
             isConfigured: jest.fn().mockReturnValue(true),
+            getFallbackProjectKey: jest.fn().mockReturnValue('PROJ'),
+            listProjects: jest.fn().mockResolvedValue([
+              { key: 'PROJ', name: 'Project', description: '', aiContext: 'Project' },
+            ]),
           },
         },
         {
           provide: JiraSendService,
           useValue: {
             enqueueSend: jest.fn().mockResolvedValue(undefined),
+          },
+        },
+        {
+          provide: extractionConfiguration.KEY,
+          useValue: {
+            extractionConfidenceThreshold: 0.6,
+            projectConfidenceThreshold: 0.6,
+            meetingRelevanceThreshold: 0.7,
           },
         },
       ],
