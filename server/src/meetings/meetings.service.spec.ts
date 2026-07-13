@@ -248,22 +248,46 @@ describe('MeetingsService', () => {
   });
 
   describe('deleteMeeting', () => {
-    it('should throw NotFoundException when meeting does not belong to user', async () => {
+    it('should throw NotFoundException when meeting does not exist', async () => {
       meetingRepo.findOne.mockResolvedValue(null);
 
       await expect(
-        service.deleteMeeting(OTHER_USER_ID, 'uuid-1234'),
+        service.deleteMeeting(buildUser(), 'uuid-1234'),
       ).rejects.toThrow(NotFoundException);
     });
 
-    it('should delete blob and meeting record on success', async () => {
+    it('should throw ForbiddenException when another user owns the meeting', async () => {
+      const meeting = buildMeeting({ userId: OTHER_USER_ID });
+      meetingRepo.findOne.mockResolvedValue(meeting);
+
+      await expect(
+        service.deleteMeeting(buildUser(), meeting.id),
+      ).rejects.toThrow(ForbiddenException);
+    });
+
+    it('should allow admin to delete another user meeting in the same organization', async () => {
+      const meeting = buildMeeting({ userId: OTHER_USER_ID });
+      meetingRepo.findOne.mockResolvedValue(meeting);
+
+      await service.deleteMeeting(
+        buildUser({ id: 'admin-1', role: UserRole.Admin }),
+        meeting.id,
+      );
+
+      expect(blobStorageService.deleteBlob).toHaveBeenCalledWith(
+        meeting.storedFileName,
+      );
+      expect(meetingRepo.delete).toHaveBeenCalledWith(meeting.id);
+    });
+
+    it('should delete blob and meeting record when owner deletes', async () => {
       const meeting = buildMeeting();
       meetingRepo.findOne.mockResolvedValue(meeting);
 
-      await service.deleteMeeting(USER_ID, meeting.id);
+      await service.deleteMeeting(buildUser(), meeting.id);
 
       expect(meetingRepo.findOne).toHaveBeenCalledWith({
-        where: { id: meeting.id, userId: USER_ID },
+        where: { id: meeting.id },
       });
       expect(blobStorageService.deleteBlob).toHaveBeenCalledWith(
         meeting.storedFileName,
@@ -276,7 +300,7 @@ describe('MeetingsService', () => {
       meetingRepo.findOne.mockResolvedValue(meeting);
       blobStorageService.deleteBlob.mockRejectedValue(new Error('Azure 404'));
 
-      await service.deleteMeeting(USER_ID, meeting.id);
+      await service.deleteMeeting(buildUser(), meeting.id);
 
       expect(meetingRepo.delete).toHaveBeenCalledWith(meeting.id);
     });

@@ -15,6 +15,22 @@ tenancy. If it is low effort, add an `organization_id` column now with a
 single default organization row, since that will make Phase 11 migrations
 easier, but do not build organization management UI yet.
 
+### Access model (within an organization)
+
+| Role | Meetings | Extracted items | Delete meeting |
+|------|----------|-----------------|----------------|
+| `USER` | Own uploads only (`userId` match) | Edit/dismiss on own meetings | Own meetings only |
+| `ADMIN` | All meetings in the org (`organizationId` match) | View/edit/dismiss/approve on any org meeting | Any org meeting |
+
+**Decision:** `USER` accounts do **not** see or act on meetings uploaded by
+other users in the same organization. Organization membership is for tenant
+isolation and admin oversight (Jira approval, org settings), not a shared
+team library. Only `ADMIN` gets org-wide visibility and management.
+
+Enforce this in `server/src/common/access/meeting-access.ts`
+(`assertMeetingAccess`) and reuse it for every meeting-scoped action,
+including `DELETE /meetings/:id`.
+
 ## Current state (pre-Phase 10)
 
 Use this as the baseline when implementing. Nothing below should be
@@ -150,21 +166,25 @@ Wire `RolesGuard` alongside existing `AuthGuard`:
 - `PUT /jira/projects/:key/context` (Jira AI context configuration from
   Phase 9)
 
-**USER and ADMIN (with ownership rules):**
+**USER and ADMIN (with access rules from `assertMeetingAccess`):**
 
+- `GET /meetings`, `GET /meetings/:id` — USER: own only; ADMIN: org-wide
+- `DELETE /meetings/:id` — USER: own only; ADMIN: any org meeting
 - `PATCH /extracted-items/:id` (edit draft)
 - `PATCH /extracted-items/:id/reject`
 - `GET /extracted-items/meeting/:meetingId`
 
-Ownership logic in `ExtractedItemsService`:
+Ownership logic in `ExtractedItemsService` and `MeetingsService` (via
+`assertMeetingAccess` in `server/src/common/access/meeting-access.ts`):
 
-- `USER`: keep current behavior — only items whose parent meeting has
-  `userId === req.user.id` (and, if org scaffolding exists,
-  `organization_id === req.user.organization_id`).
-- `ADMIN`: may act on any item in their organization. Without org
-  scaffolding, any item in the app.
-- Return `403 Forbidden` (not `404`) when a `USER` hits another user's
-  item, so the role boundary is explicit.
+- `USER`: only resources whose parent meeting has
+  `userId === req.user.id` (and, with org scaffolding,
+  `organization_id === req.user.organization_id` as a defense-in-depth
+  check once multi-tenancy is active).
+- `ADMIN`: may view, edit, approve, and delete any meeting or extracted
+  item in their organization (`organizationId` match).
+- Return **403 Forbidden** (not `404`) when a `USER` hits another user's
+  resource, so the role boundary is explicit.
 
 The reject action for a `USER` may be renamed to **"Dismiss"** in frontend
 copy only; keep `ExtractedItemStatus.Rejected` as the status value. Add a
@@ -189,6 +209,8 @@ Add or extend specs:
   `ADMIN` succeeds.
 - `extracted-items.service.spec.ts` — ownership: `USER` cannot edit
   another user's item; `ADMIN` can (within org when scaffolded).
+- `meetings.service.spec.ts` — `USER` cannot delete another user's meeting;
+  `ADMIN` can delete any org meeting; cross-user access returns 403.
 - `jira.controller.spec.ts` (or service spec) — non-admin cannot update
   project context.
 - Client: `ExtractedItemsReview.spec.tsx` — approve button absent for
@@ -233,6 +255,7 @@ client/src/
 - Per-organization Jira credentials (still single env-based Jira account
   from Phases 8–9).
 - User management screen / invite flows.
+- Org-wide meeting visibility for `USER` (other users' uploads stay hidden).
 - Refresh tokens or auth mechanism changes.
 
 ## Acceptance criteria
@@ -247,14 +270,18 @@ client/src/
    Forbidden**.
 5. An `ADMIN` can approve items (own or, with org scaffolding, any item
    in the default organization) and trigger Jira creation.
-6. An `ADMIN` can update Jira project AI context on the settings page.
-7. `GET /api/auth/me` returns `role` (`USER` or `ADMIN`); the dashboard
+6. An `ADMIN` can view, edit, approve, and delete any meeting in their
+   organization, including meetings uploaded by other users.
+7. A `USER` cannot delete another user's meeting and receives **403
+   Forbidden** (not 404).
+8. An `ADMIN` can update Jira project AI context on the settings page.
+9. `GET /api/auth/me` returns `role` (`USER` or `ADMIN`); the dashboard
    header displays it.
-8. Migration backfills existing users as `USER` without breaking login,
-   meeting history, or extraction flows.
-9. `docs/architecture/security.md` and `database-schema.md` are updated to
-   reflect what was actually built (including whether org scaffolding
-   was added).
+10. Migration backfills existing users as `USER` without breaking login,
+    meeting history, or extraction flows.
+11. `docs/architecture/security.md` and `database-schema.md` are updated to
+    reflect what was actually built (including whether org scaffolding
+    was added).
 
 ## Architecture docs to update on completion
 

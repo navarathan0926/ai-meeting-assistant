@@ -135,13 +135,13 @@ describe('MeetingsController', () => {
   });
 
   describe('remove', () => {
-    it('should delegate to MeetingsService.deleteMeeting with user id', async () => {
+    it('should delegate to MeetingsService.deleteMeeting with user', async () => {
       meetingsService.deleteMeeting.mockResolvedValue(undefined);
 
       await controller.remove(TEST_USER, 'uuid-1234');
 
       expect(meetingsService.deleteMeeting).toHaveBeenCalledWith(
-        TEST_USER.id,
+        TEST_USER,
         'uuid-1234',
       );
     });

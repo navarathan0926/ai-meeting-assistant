@@ -74,6 +74,6 @@ export class MeetingsController {
     @CurrentUser() user: User,
     @Param('id', ParseUUIDPipe) id: string,
   ): Promise<void> {
-    return this.meetingsService.deleteMeeting(user.id, id);
+    return this.meetingsService.deleteMeeting(user, id);
   }
 }

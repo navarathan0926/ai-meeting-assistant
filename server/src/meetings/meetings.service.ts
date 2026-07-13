@@ -138,13 +138,8 @@ export class MeetingsService {
     return { items, total };
   }
 
-  async deleteMeeting(userId: string, id: string): Promise<void> {
-    const meeting = await this.meetingRepository.findOne({
-      where: { id, userId },
-    });
-    if (!meeting) {
-      throw new NotFoundException(`Meeting with id "${id}" not found.`);
-    }
+  async deleteMeeting(user: User, id: string): Promise<void> {
+    const meeting = await this.assertAccessible(user, id);
 
     try {
       await this.blobStorageService.deleteBlob(meeting.storedFileName);
