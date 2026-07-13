@@ -13,6 +13,9 @@ import { randomUUID } from 'crypto';
 import { Meeting } from './entities/meeting.entity';
 import { MeetingStatus } from './enums/meeting-status.enum';
 import { MeetingResponse } from './interfaces/meeting-response.interface';
+import { User } from '../auth/entities/user.entity';
+import { UserRole } from '../auth/enums/user-role.enum';
+import { assertMeetingAccess } from '../common/access/meeting-access';
 import { TranscriptionsService } from '../transcriptions/transcriptions.service';
 import { SummariesService } from '../summaries/summaries.service';
 import { BlobStorageService } from '../storage/blob-storage.service';
@@ -50,7 +53,7 @@ export class MeetingsService {
 
   async createFromUpload(
     file: Express.Multer.File,
-    userId: string,
+    user: User,
   ): Promise<MeetingResponse> {
     this.validateFile(file);
 
@@ -71,7 +74,8 @@ export class MeetingsService {
       title,
       storedFileName,
       status: MeetingStatus.PENDING,
-      userId,
+      userId: user.id,
+      organizationId: user.organizationId,
     });
     const saved = await this.meetingRepository.save(meeting);
 
@@ -83,19 +87,21 @@ export class MeetingsService {
     return this.toResponse(saved, jobId);
   }
 
-  async findOne(userId: string, id: string): Promise<MeetingResponse> {
+  async findOne(user: User, id: string): Promise<MeetingResponse> {
     const meeting = await this.meetingRepository.findOne({
-      where: { id, userId },
+      where: { id },
       relations: ['transcription', 'summary'],
     });
     if (!meeting) {
       throw new NotFoundException(`Meeting with id "${id}" not found.`);
     }
+
+    assertMeetingAccess(user, meeting);
     return this.toResponse(meeting);
   }
 
   async findAll(
-    userId: string,
+    user: User,
     options: { page: number; limit: number; search?: string },
   ): Promise<{ items: MeetingResponse[]; total: number }> {
     const { page, limit, search } = options;
@@ -105,10 +111,17 @@ export class MeetingsService {
       .createQueryBuilder('meeting')
       .leftJoinAndSelect('meeting.transcription', 'transcription')
       .leftJoinAndSelect('meeting.summary', 'summary')
-      .where('meeting.userId = :userId', { userId })
       .orderBy('meeting.createdAt', 'DESC')
       .skip(skip)
       .take(limit);
+
+    if (user.role === UserRole.Admin) {
+      qb.where('meeting.organizationId = :organizationId', {
+        organizationId: user.organizationId,
+      });
+    } else {
+      qb.where('meeting.userId = :userId', { userId: user.id });
+    }
 
     if (search?.trim()) {
       qb.andWhere(
@@ -145,15 +158,18 @@ export class MeetingsService {
     this.logger.log(`Meeting ${id} deleted.`);
   }
 
-  async assertOwned(userId: string, meetingId: string): Promise<void> {
-    const exists = await this.meetingRepository.exists({
-      where: { id: meetingId, userId },
+  async assertAccessible(user: User, meetingId: string): Promise<Meeting> {
+    const meeting = await this.meetingRepository.findOne({
+      where: { id: meetingId },
     });
-    if (!exists) {
+    if (!meeting) {
       throw new NotFoundException(
         `Meeting with id "${meetingId}" not found.`,
       );
     }
+
+    assertMeetingAccess(user, meeting);
+    return meeting;
   }
 
   private validateFile(file: Express.Multer.File): void {

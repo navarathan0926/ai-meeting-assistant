@@ -66,12 +66,29 @@ jest.mock('@/hooks/useJiraProjects', () => ({
   })),
 }));
 
+jest.mock('@/providers/AuthProvider', () => ({
+  useAuthContext: jest.fn(),
+}));
+
+import { useAuthContext } from '@/providers/AuthProvider';
 import {
   useExtractedItems,
   useApproveExtractedItem,
   useRejectExtractedItem,
   useUpdateExtractedItem,
 } from '@/hooks/useExtractedItems';
+
+const mockedUseAuthContext = useAuthContext as jest.Mock;
+
+function mockAuthRole(role: 'USER' | 'ADMIN') {
+  mockedUseAuthContext.mockReturnValue({
+    user: { id: 'user-1', name: 'Test', email: 'test@example.com', role },
+    isAuthenticated: true,
+    isLoading: false,
+    login: jest.fn(),
+    logout: jest.fn(),
+  });
+}
 
 const mockedUseExtractedItems = useExtractedItems as jest.Mock;
 const mockedUseApprove = useApproveExtractedItem as jest.Mock;
@@ -117,6 +134,10 @@ function renderWithQuery(ui: React.ReactElement) {
 }
 
 describe('ExtractedItemsReview', () => {
+  beforeEach(() => {
+    mockAuthRole('ADMIN');
+  });
+
   afterEach(() => {
     jest.clearAllMocks();
   });
@@ -237,16 +258,32 @@ describe('ExtractedItemsReview', () => {
 
     renderWithQuery(<ExtractedItemsReview meetingId="meeting-1" />);
 
-    fireEvent.click(screen.getByRole('button', { name: /^reject$/i }));
+    fireEvent.click(screen.getByRole('button', { name: /^dismiss$/i }));
     expect(
-      screen.getByRole('heading', { name: 'Reject item' }),
+      screen.getByRole('heading', { name: 'Dismiss item' }),
     ).toBeInTheDocument();
 
     fireEvent.click(screen.getByRole('button', { name: /^cancel$/i }));
     expect(rejectMutate).not.toHaveBeenCalled();
     expect(
-      screen.queryByRole('heading', { name: 'Reject item' }),
+      screen.queryByRole('heading', { name: 'Dismiss item' }),
     ).not.toBeInTheDocument();
+  });
+
+  it('should hide approve button for regular users', () => {
+    mockAuthRole('USER');
+    mockedUseExtractedItems.mockReturnValue({
+      data: [buildItem()],
+      isLoading: false,
+      isFetching: false,
+    });
+
+    renderWithQuery(<ExtractedItemsReview meetingId="meeting-1" />);
+
+    expect(
+      screen.queryByRole('button', { name: /approve & send to jira/i }),
+    ).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /^dismiss$/i })).toBeInTheDocument();
   });
 
   it('should open rich description editor and save description only', () => {

@@ -101,6 +101,7 @@ describe('AuthService', () => {
         name: 'Test User',
         email: 'test@example.com',
         provider: 'local',
+        role: 'USER',
       } as User;
 
       userRepo.create.mockReturnValue(mockUser);
@@ -121,6 +122,8 @@ describe('AuthService', () => {
           name: 'Test User',
           email: 'test@example.com',
           provider: 'local',
+          role: 'USER',
+          organizationId: '00000000-0000-4000-8000-000000000001',
         }),
       );
       expect(userRepo.save).toHaveBeenCalledWith(mockUser);
@@ -131,6 +134,7 @@ describe('AuthService', () => {
           email: 'test@example.com',
           name: 'Test User',
           provider: 'local',
+          role: 'USER',
         },
       });
     });
@@ -300,6 +304,8 @@ describe('AuthService', () => {
         googleId: 'google-999',
         provider: 'google',
         passwordHash: null,
+        role: 'USER',
+        organizationId: '00000000-0000-4000-8000-000000000001',
       });
       expect(userRepo.save).toHaveBeenCalledWith(mockUser);
       expect(result.user.id).toBe('new-uuid');

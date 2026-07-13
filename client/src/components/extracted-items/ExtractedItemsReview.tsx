@@ -18,6 +18,7 @@ import {
   useUpdateExtractedItem,
 } from '@/hooks/useExtractedItems';
 import { useJiraProjects } from '@/hooks/useJiraProjects';
+import { useAuthContext } from '@/providers/AuthProvider';
 import { ConfirmationModal } from '@/components/common/ConfirmationModal';
 import { ProjectSelector } from '@/components/extracted-items/ProjectSelector';
 import { JiraDocumentRenderer } from '@/lib/jira-document/JiraDocumentRenderer';
@@ -49,6 +50,8 @@ export function ExtractedItemsReview({
   meetingStatus,
   extractionAnalysis,
 }: ExtractedItemsReviewProps) {
+  const { user } = useAuthContext();
+  const canApprove = user?.role === 'ADMIN';
   const { data: items, isLoading, isFetching } = useExtractedItems(meetingId);
   const { data: projects = [] } = useJiraProjects();
 
@@ -72,7 +75,9 @@ export function ExtractedItemsReview({
     <section className="rounded-2xl border border-white/10 bg-white/5 p-5">
       <SectionTitle icon="🎯" title="Extracted Items" />
       <p className="mt-2 text-xs text-white/40">
-        Review, edit, and approve items before sending them to Jira.
+        {canApprove
+          ? 'Review, edit, and approve items before sending them to Jira.'
+          : 'Review and edit draft items. An admin must approve before items are sent to Jira.'}
       </p>
 
       <MeetingAnalysisBanner analysis={extractionAnalysis ?? null} />
@@ -90,6 +95,7 @@ export function ExtractedItemsReview({
               item={item}
               meetingId={meetingId}
               projects={projects}
+              canApprove={canApprove}
             />
           ))}
         </div>
@@ -162,10 +168,12 @@ function ExtractedItemCard({
   item,
   meetingId,
   projects,
+  canApprove,
 }: {
   item: ExtractedItem;
   meetingId: string;
   projects: ReturnType<typeof useJiraProjects>['data'];
+  canApprove: boolean;
 }) {
   const updateMutation = useUpdateExtractedItem(meetingId);
   const rejectMutation = useRejectExtractedItem(meetingId);
@@ -302,15 +310,15 @@ function ExtractedItemCard({
         }
       : pendingAction === 'reject'
         ? {
-            title: 'Reject item',
+            title: 'Dismiss item',
             message: (
               <>
-                Reject &ldquo;{item.title}&rdquo;? It will not be sent to Jira and
+                Dismiss &ldquo;{item.title}&rdquo;? It will not be sent to Jira and
                 cannot be approved later.
               </>
             ),
-            confirmLabel: 'Reject',
-            confirmingLabel: 'Rejecting…',
+            confirmLabel: 'Dismiss',
+            confirmingLabel: 'Dismissing…',
             variant: 'danger' as const,
             isConfirming: rejectMutation.isPending,
           }
@@ -466,21 +474,23 @@ function ExtractedItemCard({
           >
             Save edits
           </button>
-          <button
-            type="button"
-            disabled={isBusy}
-            onClick={() => setPendingAction('approve')}
-            className="rounded-lg bg-emerald-600/80 px-3 py-1.5 text-xs text-white hover:bg-emerald-600 disabled:opacity-50"
-          >
-            Approve &amp; send to Jira
-          </button>
+          {canApprove && (
+            <button
+              type="button"
+              disabled={isBusy}
+              onClick={() => setPendingAction('approve')}
+              className="rounded-lg bg-emerald-600/80 px-3 py-1.5 text-xs text-white hover:bg-emerald-600 disabled:opacity-50"
+            >
+              Approve &amp; send to Jira
+            </button>
+          )}
           <button
             type="button"
             disabled={isBusy}
             onClick={() => setPendingAction('reject')}
             className="rounded-lg bg-red-600/30 px-3 py-1.5 text-xs text-red-200 hover:bg-red-600/40 disabled:opacity-50"
           >
-            Reject
+            Dismiss
           </button>
         </div>
       )}

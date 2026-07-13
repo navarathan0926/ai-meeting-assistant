@@ -20,6 +20,8 @@ import { MeetingsService } from '../meetings/meetings.service';
 import { JiraService } from '../jira/jira.service';
 import { JiraSendService } from '../jira/jira-send.service';
 import { extractionConfiguration } from '../common/config/extraction.config';
+import { User } from '../auth/entities/user.entity';
+import { assertMeetingAccess } from '../common/access/meeting-access';
 
 @Injectable()
 export class ExtractedItemsService {
@@ -36,10 +38,10 @@ export class ExtractedItemsService {
   ) {}
 
   async findByMeeting(
-    userId: string,
+    user: User,
     meetingId: string,
   ): Promise<ExtractedItemResponse[]> {
-    await this.meetingsService.assertOwned(userId, meetingId);
+    await this.meetingsService.assertAccessible(user, meetingId);
 
     const items = await this.extractedItemRepository.find({
       where: { meetingId },
@@ -50,11 +52,11 @@ export class ExtractedItemsService {
   }
 
   async updateDraft(
-    userId: string,
+    user: User,
     itemId: string,
     dto: UpdateExtractedItemDto,
   ): Promise<ExtractedItemResponse> {
-    const item = await this.findOwnedItem(userId, itemId);
+    const item = await this.findAccessibleItem(user, itemId);
 
     if (item.status !== ExtractedItemStatus.Draft) {
       throw new BadRequestException('Only draft items can be edited.');
@@ -83,8 +85,8 @@ export class ExtractedItemsService {
     return this.toResponse(saved);
   }
 
-  async reject(userId: string, itemId: string): Promise<ExtractedItemResponse> {
-    const item = await this.findOwnedItem(userId, itemId);
+  async reject(user: User, itemId: string): Promise<ExtractedItemResponse> {
+    const item = await this.findAccessibleItem(user, itemId);
 
     if (item.status !== ExtractedItemStatus.Draft) {
       throw new BadRequestException(
@@ -98,10 +100,10 @@ export class ExtractedItemsService {
   }
 
   async approve(
-    userId: string,
+    user: User,
     itemId: string,
   ): Promise<ApproveExtractedItemResponse> {
-    const owned = await this.findOwnedItem(userId, itemId);
+    const owned = await this.findAccessibleItem(user, itemId);
     const resolvedProjectKey = this.resolveProjectKey(owned);
 
     if (!resolvedProjectKey) {
@@ -235,12 +237,13 @@ export class ExtractedItemsService {
     };
   }
 
-  private async findOwnedItem(
-    userId: string,
+  private async findAccessibleItem(
+    user: User,
     itemId: string,
   ): Promise<ExtractedItem> {
     const item = await this.extractedItemRepository.findOne({
       where: { id: itemId },
+      relations: ['meeting'],
     });
 
     if (!item) {
@@ -249,7 +252,7 @@ export class ExtractedItemsService {
       );
     }
 
-    await this.meetingsService.assertOwned(userId, item.meetingId);
+    assertMeetingAccess(user, item.meeting);
     return item;
   }
 

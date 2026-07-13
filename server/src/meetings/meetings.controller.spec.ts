@@ -5,6 +5,9 @@ import { MeetingStatus } from './enums/meeting-status.enum';
 import { MeetingResponse } from './interfaces/meeting-response.interface';
 import { User } from '../auth/entities/user.entity';
 
+import { UserRole } from '../auth/enums/user-role.enum';
+import { DEFAULT_ORGANIZATION_ID } from '../organizations/organizations.constants';
+
 const TEST_USER: User = {
   id: 'user-uuid-1',
   email: 'test@example.com',
@@ -12,6 +15,8 @@ const TEST_USER: User = {
   passwordHash: null,
   provider: 'local',
   googleId: null,
+  role: UserRole.User,
+  organizationId: DEFAULT_ORGANIZATION_ID,
   meetings: [],
   createdAt: new Date(),
   updatedAt: new Date(),
@@ -83,7 +88,7 @@ describe('MeetingsController', () => {
 
       expect(meetingsService.createFromUpload).toHaveBeenCalledWith(
         file,
-        TEST_USER.id,
+        TEST_USER,
       );
       expect(result).toBe(response);
     });
@@ -99,7 +104,7 @@ describe('MeetingsController', () => {
         search: 'standup',
       });
 
-      expect(meetingsService.findAll).toHaveBeenCalledWith(TEST_USER.id, {
+      expect(meetingsService.findAll).toHaveBeenCalledWith(TEST_USER, {
         page: 2,
         limit: 10,
         search: 'standup',
@@ -122,7 +127,7 @@ describe('MeetingsController', () => {
       const result = await controller.findOne(TEST_USER, 'uuid-1234');
 
       expect(meetingsService.findOne).toHaveBeenCalledWith(
-        TEST_USER.id,
+        TEST_USER,
         'uuid-1234',
       );
       expect(result).toBe(meeting);

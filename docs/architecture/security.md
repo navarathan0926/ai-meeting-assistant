@@ -47,30 +47,30 @@ Introduced in Phase 10. Three roles, ordered by permission level:
 | Guard | Location | Purpose |
 |-------|----------|---------|
 | `JwtAuthGuard` | `common/guards/auth.guard.ts` | Validates JWT on every protected route |
-| `RolesGuard` | `auth/guards/` (planned) | Checks `@Roles()` decorator on endpoint |
+| `RolesGuard` | `common/guards/roles.guard.ts` | Checks `@Roles()` / `@RequireRoles()` on endpoint |
 | `OrganizationGuard` | `organizations/` (Phase 11) | Ensures resource belongs to requester's org |
 
 ### Decorator Usage
 
 ```typescript
 // Require authentication only
-@UseGuards(JwtAuthGuard)
+@Auth()
 
-// Require specific role
-@UseGuards(JwtAuthGuard, RolesGuard)
-@Roles(Role.ADMIN)
+// Require ADMIN (auth + role check)
+@RequireRoles(UserRole.Admin)
 
-// SUPERADMIN-only routes
-@UseGuards(JwtAuthGuard, RolesGuard)
-@Roles(Role.SUPERADMIN)
+// Compose manually if needed
+@Auth()
+@Roles(UserRole.Admin)
+@UseGuards(RolesGuard)
 ```
 
 ### Resource Ownership
 
-- A `USER` can only access meetings they uploaded (`meeting.user_id === req.user.id`).
-- An `ADMIN` can access all meetings within their organization.
-- A `SUPERADMIN` can access all meetings across all organizations.
-- The `OrganizationGuard` enforces org-level scoping for ADMIN and USER roles.
+- A `USER` can only access meetings they uploaded (`meeting.userId === req.user.id`). Cross-user access returns **403 Forbidden**.
+- An `ADMIN` can access all meetings and extracted items within their organization (`organizationId` match).
+- A `SUPERADMIN` can access all meetings across all organizations (Phase 11).
+- `OrganizationGuard` (Phase 11) will formalize org-level scoping; Phase 10 uses `assertMeetingAccess` in services.
 
 ---
 

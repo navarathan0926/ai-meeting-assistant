@@ -12,12 +12,43 @@ import { JiraSendService } from '../jira/jira-send.service';
 import {
   BadRequestException,
   ConflictException,
+  ForbiddenException,
   NotFoundException,
 } from '@nestjs/common';
 import { blocksToAdf } from '../common/jira-document/blocks-to-adf';
 import { extractionConfiguration } from '../common/config/extraction.config';
+import { User } from '../auth/entities/user.entity';
+import { UserRole } from '../auth/enums/user-role.enum';
+import { DEFAULT_ORGANIZATION_ID } from '../organizations/organizations.constants';
+import { Meeting } from '../meetings/entities/meeting.entity';
 
 const sampleAdf = blocksToAdf([{ type: 'paragraph', text: 'Users cannot log in.' }]);
+
+const ORG_ID = DEFAULT_ORGANIZATION_ID;
+
+function buildUser(overrides: Partial<User> = {}): User {
+  const user = new User();
+  user.id = 'user-1';
+  user.email = 'user@example.com';
+  user.name = 'Test User';
+  user.passwordHash = null;
+  user.provider = 'local';
+  user.googleId = null;
+  user.role = UserRole.User;
+  user.organizationId = ORG_ID;
+  user.meetings = [];
+  user.createdAt = new Date();
+  user.updatedAt = new Date();
+  return Object.assign(user, overrides);
+}
+
+function buildMeeting(overrides: Partial<Meeting> = {}): Meeting {
+  const meeting = new Meeting();
+  meeting.id = 'meeting-uuid';
+  meeting.userId = 'user-1';
+  meeting.organizationId = ORG_ID;
+  return Object.assign(meeting, overrides);
+}
 
 function buildItem(overrides: Partial<ExtractedItem> = {}): ExtractedItem {
   const item = new ExtractedItem();
@@ -35,6 +66,8 @@ function buildItem(overrides: Partial<ExtractedItem> = {}): ExtractedItem {
   item.projectConfidence = 0.9;
   item.extractionConfidence = 0.85;
   item.finalProjectKey = null;
+  item.organizationId = ORG_ID;
+  item.meeting = buildMeeting();
   item.createdAt = new Date();
   item.updatedAt = new Date();
   return Object.assign(item, overrides);
@@ -63,7 +96,7 @@ describe('ExtractedItemsService', () => {
         {
           provide: MeetingsService,
           useValue: {
-            assertOwned: jest.fn().mockResolvedValue(undefined),
+            assertAccessible: jest.fn().mockResolvedValue(buildMeeting()),
           },
         },
         {
@@ -106,10 +139,10 @@ describe('ExtractedItemsService', () => {
     it('should assert ownership and return mapped items', async () => {
       repo.find.mockResolvedValue([buildItem()]);
 
-      const result = await service.findByMeeting('user-1', 'meeting-uuid');
+      const result = await service.findByMeeting(buildUser(), 'meeting-uuid');
 
-      expect(meetingsService.assertOwned).toHaveBeenCalledWith(
-        'user-1',
+      expect(meetingsService.assertAccessible).toHaveBeenCalledWith(
+        expect.objectContaining({ id: 'user-1' }),
         'meeting-uuid',
       );
       expect(result).toHaveLength(1);
@@ -121,11 +154,23 @@ describe('ExtractedItemsService', () => {
     it('should update a draft item', async () => {
       repo.findOne.mockResolvedValue(buildItem());
 
-      const result = await service.updateDraft('user-1', 'item-uuid', {
+      const result = await service.updateDraft(buildUser(), 'item-uuid', {
         title: 'Updated title',
       });
 
       expect(result.title).toBe('Updated title');
+    });
+
+    it('should throw ForbiddenException when user cannot access the meeting', async () => {
+      repo.findOne.mockResolvedValue(
+        buildItem({
+          meeting: buildMeeting({ userId: 'other-user' }),
+        }),
+      );
+
+      await expect(
+        service.updateDraft(buildUser(), 'item-uuid', { title: 'Nope' }),
+      ).rejects.toThrow(ForbiddenException);
     });
 
     it('should reject updates to non-draft items', async () => {
@@ -134,7 +179,7 @@ describe('ExtractedItemsService', () => {
       );
 
       await expect(
-        service.updateDraft('user-1', 'item-uuid', { title: 'New title' }),
+        service.updateDraft(buildUser(), 'item-uuid', { title: 'New title' }),
       ).rejects.toThrow(BadRequestException);
     });
   });
@@ -143,7 +188,7 @@ describe('ExtractedItemsService', () => {
     it('should mark a draft item as rejected', async () => {
       repo.findOne.mockResolvedValue(buildItem());
 
-      const result = await service.reject('user-1', 'item-uuid');
+      const result = await service.reject(buildUser(), 'item-uuid');
 
       expect(result.status).toBe(ExtractedItemStatus.Rejected);
     });
@@ -153,7 +198,7 @@ describe('ExtractedItemsService', () => {
         buildItem({ status: ExtractedItemStatus.Approved }),
       );
 
-      await expect(service.reject('user-1', 'item-uuid')).rejects.toThrow(
+      await expect(service.reject(buildUser(), 'item-uuid')).rejects.toThrow(
         BadRequestException,
       );
     });
@@ -161,7 +206,7 @@ describe('ExtractedItemsService', () => {
     it('should throw when item is not found', async () => {
       repo.findOne.mockResolvedValue(null);
 
-      await expect(service.reject('user-1', 'missing')).rejects.toThrow(
+      await expect(service.reject(buildUser(), 'missing')).rejects.toThrow(
         NotFoundException,
       );
     });
@@ -174,7 +219,7 @@ describe('ExtractedItemsService', () => {
         .mockResolvedValueOnce(buildItem({ status: ExtractedItemStatus.Approved }));
       repo.update.mockResolvedValue({ affected: 1, raw: [], generatedMaps: [] });
 
-      const result = await service.approve('user-1', 'item-uuid');
+      const result = await service.approve(buildUser(), 'item-uuid');
 
       expect(jiraSendService.enqueueSend).toHaveBeenCalledWith('item-uuid');
       expect(result.status).toBe(ExtractedItemStatus.Approved);
@@ -188,7 +233,7 @@ describe('ExtractedItemsService', () => {
       repo.update.mockResolvedValue({ affected: 1, raw: [], generatedMaps: [] });
       jiraSendService.enqueueSend.mockRejectedValue(new Error('Queue unavailable'));
 
-      const result = await service.approve('user-1', 'item-uuid');
+      const result = await service.approve(buildUser(), 'item-uuid');
 
       expect(result.status).toBe(ExtractedItemStatus.Draft);
       expect(result.jiraError).toContain('Queue unavailable');
@@ -202,7 +247,7 @@ describe('ExtractedItemsService', () => {
         );
       repo.update.mockResolvedValue({ affected: 0, raw: [], generatedMaps: [] });
 
-      await expect(service.approve('user-1', 'item-uuid')).rejects.toThrow(
+      await expect(service.approve(buildUser(), 'item-uuid')).rejects.toThrow(
         ConflictException,
       );
     });
@@ -217,7 +262,7 @@ describe('ExtractedItemsService', () => {
         );
       repo.update.mockResolvedValue({ affected: 0, raw: [], generatedMaps: [] });
 
-      await expect(service.approve('user-1', 'item-uuid')).rejects.toThrow(
+      await expect(service.approve(buildUser(), 'item-uuid')).rejects.toThrow(
         BadRequestException,
       );
     });

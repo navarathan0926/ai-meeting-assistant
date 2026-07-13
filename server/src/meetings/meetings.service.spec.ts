@@ -1,10 +1,13 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { getRepositoryToken } from '@nestjs/typeorm';
-import { BadRequestException, NotFoundException } from '@nestjs/common';
+import { BadRequestException, NotFoundException, ForbiddenException } from '@nestjs/common';
 import { Repository, SelectQueryBuilder } from 'typeorm';
 import { MeetingsService } from './meetings.service';
 import { Meeting } from './entities/meeting.entity';
 import { MeetingStatus } from './enums/meeting-status.enum';
+import { User } from '../auth/entities/user.entity';
+import { UserRole } from '../auth/enums/user-role.enum';
+import { DEFAULT_ORGANIZATION_ID } from '../organizations/organizations.constants';
 import { TranscriptionsService } from '../transcriptions/transcriptions.service';
 import { SummariesService } from '../summaries/summaries.service';
 import { BlobStorageService } from '../storage/blob-storage.service';
@@ -13,6 +16,23 @@ import { extractionConfiguration } from '../common/config/extraction.config';
 
 const USER_ID = 'user-uuid-1';
 const OTHER_USER_ID = 'user-uuid-2';
+const ORG_ID = DEFAULT_ORGANIZATION_ID;
+
+function buildUser(overrides: Partial<User> = {}): User {
+  const user = new User();
+  user.id = USER_ID;
+  user.email = 'user@example.com';
+  user.name = 'Test User';
+  user.passwordHash = null;
+  user.provider = 'local';
+  user.googleId = null;
+  user.role = UserRole.User;
+  user.organizationId = ORG_ID;
+  user.meetings = [];
+  user.createdAt = new Date();
+  user.updatedAt = new Date();
+  return Object.assign(user, overrides);
+}
 
 function buildFile(overrides: Partial<Express.Multer.File> = {}): Express.Multer.File {
   return {
@@ -39,6 +59,7 @@ function buildMeeting(overrides: Partial<Meeting> = {}): Meeting {
   m.status = MeetingStatus.PENDING;
   m.errorMessage = null;
   m.userId = USER_ID;
+  m.organizationId = ORG_ID;
   m.transcription = null;
   m.summary = null;
   m.createdAt = new Date('2024-01-01');
@@ -123,31 +144,32 @@ describe('MeetingsService', () => {
   describe('createFromUpload', () => {
     it('should throw BadRequestException when no file is provided', async () => {
       await expect(
-        service.createFromUpload(null as any, USER_ID),
+        service.createFromUpload(null as any, buildUser()),
       ).rejects.toThrow(BadRequestException);
     });
 
     it('should throw BadRequestException for unsupported MIME type', async () => {
       const file = buildFile({ mimetype: 'text/plain' });
-      await expect(service.createFromUpload(file, USER_ID)).rejects.toThrow(
+      await expect(service.createFromUpload(file, buildUser())).rejects.toThrow(
         BadRequestException,
       );
     });
 
     it('should throw BadRequestException when file exceeds 25 MB', async () => {
       const file = buildFile({ size: 26 * 1024 * 1024 });
-      await expect(service.createFromUpload(file, USER_ID)).rejects.toThrow(
+      await expect(service.createFromUpload(file, buildUser())).rejects.toThrow(
         'File too large',
       );
     });
 
     it('should upload blob, save meeting with userId and queue extraction job', async () => {
       const file = buildFile();
+      const user = buildUser();
       const savedMeeting = buildMeeting();
       meetingRepo.create.mockReturnValue(savedMeeting);
       meetingRepo.save.mockResolvedValue(savedMeeting);
 
-      const result = await service.createFromUpload(file, USER_ID);
+      const result = await service.createFromUpload(file, user);
 
       expect(meetingRepo.create).toHaveBeenCalledWith(
         expect.objectContaining({
@@ -155,6 +177,7 @@ describe('MeetingsService', () => {
           title: 'meeting',
           status: MeetingStatus.PENDING,
           userId: USER_ID,
+          organizationId: ORG_ID,
         }),
       );
       expect(extractionService.addExtractJob).toHaveBeenCalledWith(
@@ -166,34 +189,43 @@ describe('MeetingsService', () => {
   });
 
   describe('findOne', () => {
-    it('should return a meeting when found for the user', async () => {
+    it('should return a meeting when user has access', async () => {
       const meeting = buildMeeting();
       meetingRepo.findOne.mockResolvedValue(meeting);
 
-      const result = await service.findOne(USER_ID, meeting.id);
+      const result = await service.findOne(buildUser(), meeting.id);
 
       expect(meetingRepo.findOne).toHaveBeenCalledWith({
-        where: { id: meeting.id, userId: USER_ID },
+        where: { id: meeting.id },
         relations: ['transcription', 'summary'],
       });
       expect(result.id).toBe(meeting.id);
     });
 
-    it('should throw NotFoundException when meeting does not exist for user', async () => {
+    it('should throw NotFoundException when meeting does not exist', async () => {
       meetingRepo.findOne.mockResolvedValue(null);
 
-      await expect(service.findOne(USER_ID, 'non-existent')).rejects.toThrow(
-        NotFoundException,
-      );
+      await expect(
+        service.findOne(buildUser(), 'non-existent'),
+      ).rejects.toThrow(NotFoundException);
+    });
+
+    it('should throw ForbiddenException when user does not own the meeting', async () => {
+      const meeting = buildMeeting({ userId: OTHER_USER_ID });
+      meetingRepo.findOne.mockResolvedValue(meeting);
+
+      await expect(
+        service.findOne(buildUser(), meeting.id),
+      ).rejects.toThrow(ForbiddenException);
     });
   });
 
   describe('findAll', () => {
-    it('should filter by userId', async () => {
+    it('should filter by userId for regular users', async () => {
       const qb = meetingRepo.createQueryBuilder('meeting') as any;
       qb.getManyAndCount.mockResolvedValue([[], 0]);
 
-      await service.findAll(USER_ID, { page: 1, limit: 20 });
+      await service.findAll(buildUser(), { page: 1, limit: 20 });
 
       expect(qb.where).toHaveBeenCalledWith('meeting.userId = :userId', {
         userId: USER_ID,
@@ -206,7 +238,7 @@ describe('MeetingsService', () => {
       const qb = meetingRepo.createQueryBuilder() as any;
       qb.getManyAndCount.mockResolvedValue([[], 0]);
 
-      await service.findAll(USER_ID, { page: 1, limit: 20, search: 'standup' });
+      await service.findAll(buildUser(), { page: 1, limit: 20, search: 'standup' });
 
       expect(qb.andWhere).toHaveBeenCalledWith(
         expect.stringContaining('ILIKE'),
@@ -250,21 +282,35 @@ describe('MeetingsService', () => {
     });
   });
 
-  describe('assertOwned', () => {
-    it('should not throw when meeting belongs to user', async () => {
-      meetingRepo.exists.mockResolvedValue(true);
+  describe('assertAccessible', () => {
+    it('should return meeting when user owns it', async () => {
+      const meeting = buildMeeting();
+      meetingRepo.findOne.mockResolvedValue(meeting);
 
       await expect(
-        service.assertOwned(USER_ID, 'uuid-1234'),
-      ).resolves.toBeUndefined();
+        service.assertAccessible(buildUser(), meeting.id),
+      ).resolves.toEqual(meeting);
     });
 
-    it('should throw NotFoundException when meeting does not belong to user', async () => {
-      meetingRepo.exists.mockResolvedValue(false);
+    it('should throw ForbiddenException when another user owns the meeting', async () => {
+      const meeting = buildMeeting({ userId: OTHER_USER_ID });
+      meetingRepo.findOne.mockResolvedValue(meeting);
 
       await expect(
-        service.assertOwned(OTHER_USER_ID, 'uuid-1234'),
-      ).rejects.toThrow(NotFoundException);
+        service.assertAccessible(buildUser(), meeting.id),
+      ).rejects.toThrow(ForbiddenException);
+    });
+
+    it('should allow admin to access meetings in their organization', async () => {
+      const meeting = buildMeeting({ userId: OTHER_USER_ID });
+      meetingRepo.findOne.mockResolvedValue(meeting);
+
+      await expect(
+        service.assertAccessible(
+          buildUser({ id: 'admin-1', role: UserRole.Admin }),
+          meeting.id,
+        ),
+      ).resolves.toEqual(meeting);
     });
   });
 
@@ -281,7 +327,7 @@ describe('MeetingsService', () => {
       const meeting = buildMeeting({ transcription: { id: 't1' } as any });
       meetingRepo.findOne.mockResolvedValue(meeting);
 
-      const result = await service.findOne(USER_ID, meeting.id);
+      const result = await service.findOne(buildUser(), meeting.id);
       expect(result.transcription).toEqual(transcriptionMock);
     });
 
@@ -292,7 +338,7 @@ describe('MeetingsService', () => {
         throw new Error('SAS error');
       });
 
-      const result = await service.findOne(USER_ID, meeting.id);
+      const result = await service.findOne(buildUser(), meeting.id);
       expect(result.audioUrl).toBeUndefined();
     });
   });

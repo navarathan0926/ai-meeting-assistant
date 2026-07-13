@@ -19,6 +19,7 @@ import { Summary } from '../summaries/entities/summary.entity';
 import { User } from '../auth/entities/user.entity';
 import { ExtractedItem } from '../extracted-items/entities/extracted-item.entity';
 import { ProjectContext } from '../jira/entities/project-context.entity';
+import { Organization } from '../organizations/entities/organization.entity';
 import { buildDatabaseConfig } from '../common/config/database.config';
 
 // Ensure .env is loaded when this file is imported by the CLI
@@ -47,6 +48,7 @@ export function buildDataSourceOptions(): DataSourceOptions {
       User,
       ExtractedItem,
       ProjectContext,
+      Organization,
     ],
     synchronize: false,
     logging: false,

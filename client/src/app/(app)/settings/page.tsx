@@ -6,6 +6,7 @@ import { useAuthContext } from '@/providers/AuthProvider';
 
 export default function SettingsPage() {
   const { user, logout } = useAuthContext();
+  const isAdmin = user?.role === 'ADMIN';
 
   return (
     <div className="min-h-screen bg-[#09090f] text-white flex flex-col">
@@ -23,6 +24,11 @@ export default function SettingsPage() {
           </Link>
           <span className="text-xs text-white/50 font-mono hidden sm:inline">
             Signed in as <span className="text-[#39FF14]">{user?.name}</span>
+            {user?.role && (
+              <span className="ml-2 rounded px-1.5 py-0.5 text-[10px] uppercase tracking-wide bg-white/10 text-white/60">
+                {user.role}
+              </span>
+            )}
           </span>
           <button
             onClick={() => void logout()}
@@ -38,7 +44,9 @@ export default function SettingsPage() {
           <div>
             <h2 className="text-xl font-semibold text-white/90">Settings</h2>
             <p className="mt-1 text-sm text-white/45">
-              Configure Jira project context used during item extraction.
+              {isAdmin
+                ? 'Configure Jira project context used during item extraction.'
+                : 'Jira project context is managed by organization admins.'}
             </p>
           </div>
 
@@ -46,7 +54,14 @@ export default function SettingsPage() {
             <h3 className="font-semibold text-white/90 text-sm uppercase tracking-wide mb-4">
               Jira project AI context
             </h3>
-            <ProjectContextSettings />
+            {isAdmin ? (
+              <ProjectContextSettings />
+            ) : (
+              <p className="text-sm text-white/50">
+                You do not have permission to edit Jira settings. Contact an admin
+                if project context needs updating.
+              </p>
+            )}
           </section>
         </div>
       </main>

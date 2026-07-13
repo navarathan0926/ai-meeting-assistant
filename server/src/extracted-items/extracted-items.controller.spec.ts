@@ -5,6 +5,8 @@ import { ExtractedItemType } from './enums/extracted-item-type.enum';
 import { ExtractedItemPriority } from './enums/extracted-item-priority.enum';
 import { ExtractedItemStatus } from './enums/extracted-item-status.enum';
 import { User } from '../auth/entities/user.entity';
+import { UserRole } from '../auth/enums/user-role.enum';
+import { DEFAULT_ORGANIZATION_ID } from '../organizations/organizations.constants';
 import { blocksToAdf } from '../common/jira-document/blocks-to-adf';
 
 const sampleAdf = blocksToAdf([{ type: 'paragraph', text: 'Details' }]);
@@ -16,6 +18,8 @@ const TEST_USER: User = {
   passwordHash: null,
   provider: 'local',
   googleId: null,
+  role: UserRole.User,
+  organizationId: DEFAULT_ORGANIZATION_ID,
   meetings: [],
   createdAt: new Date(),
   updatedAt: new Date(),
