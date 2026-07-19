@@ -4,10 +4,20 @@ import { UserRole } from '../../auth/enums/user-role.enum';
 import { Meeting } from '../../meetings/entities/meeting.entity';
 
 export function assertMeetingAccess(user: User, meeting: Meeting): void {
+  if (user.role === UserRole.SuperAdmin) {
+    throw new ForbiddenException(
+      'Platform administrators cannot access organization meetings.',
+    );
+  }
+
+  if (
+    !user.organizationId ||
+    meeting.organizationId !== user.organizationId
+  ) {
+    throw new ForbiddenException('You do not have access to this meeting.');
+  }
+
   if (user.role === UserRole.Admin) {
-    if (meeting.organizationId !== user.organizationId) {
-      throw new ForbiddenException('You do not have access to this meeting.');
-    }
     return;
   }
 

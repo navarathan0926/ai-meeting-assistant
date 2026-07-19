@@ -55,6 +55,12 @@ export class MeetingsService {
     file: Express.Multer.File,
     user: User,
   ): Promise<MeetingResponse> {
+    if (!user.organizationId) {
+      throw new BadRequestException(
+        'Your account is not assigned to an organization.',
+      );
+    }
+
     this.validateFile(file);
 
     const storedFileName = this.buildStoredFileName(file);

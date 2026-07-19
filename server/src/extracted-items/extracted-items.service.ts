@@ -48,7 +48,7 @@ export class ExtractedItemsService {
       order: { createdAt: 'ASC' },
     });
 
-    return items.map((item) => this.toResponse(item));
+    return Promise.all(items.map((item) => this.toResponse(item)));
   }
 
   async updateDraft(
@@ -63,7 +63,7 @@ export class ExtractedItemsService {
     }
 
     if (dto.finalProjectKey !== undefined) {
-      await this.assertValidProjectKey(dto.finalProjectKey);
+      await this.assertValidProjectKey(item.organizationId, dto.finalProjectKey);
       item.finalProjectKey = dto.finalProjectKey.trim();
     }
 
@@ -82,7 +82,7 @@ export class ExtractedItemsService {
 
     item.jiraSyncError = null;
     const saved = await this.extractedItemRepository.save(item);
-    return this.toResponse(saved);
+    return await this.toResponse(saved);
   }
 
   async reject(user: User, itemId: string): Promise<ExtractedItemResponse> {
@@ -96,7 +96,7 @@ export class ExtractedItemsService {
 
     item.status = ExtractedItemStatus.Rejected;
     const saved = await this.extractedItemRepository.save(item);
-    return this.toResponse(saved);
+    return await this.toResponse(saved);
   }
 
   async approve(
@@ -137,7 +137,7 @@ export class ExtractedItemsService {
       }
 
       if (current.status === ExtractedItemStatus.Sent) {
-        return this.toResponse(current);
+        return await this.toResponse(current);
       }
 
       if (current.status === ExtractedItemStatus.Rejected) {
@@ -165,7 +165,7 @@ export class ExtractedItemsService {
       );
     }
 
-    if (!this.jiraService.isConfigured()) {
+    if (!(await this.jiraService.isConfigured(item.organizationId))) {
       return this.revertToDraftWithError(
         item,
         'Jira integration is not configured.',
@@ -175,7 +175,7 @@ export class ExtractedItemsService {
     try {
       await this.jiraSendService.enqueueSend(itemId);
       this.logger.log(`Queued Jira send for extracted item ${itemId}`);
-      return this.toResponse(item);
+      return await this.toResponse(item);
     } catch (error) {
       const message = (error as Error).message ?? String(error);
       this.logger.error(
@@ -193,13 +193,16 @@ export class ExtractedItemsService {
     return key || null;
   }
 
-  private async assertValidProjectKey(projectKey: string): Promise<void> {
+  private async assertValidProjectKey(
+    organizationId: string,
+    projectKey: string,
+  ): Promise<void> {
     const normalized = projectKey.trim();
     if (!normalized) {
       throw new BadRequestException('Project key cannot be empty.');
     }
 
-    if (!this.jiraService.isConfigured()) {
+    if (!(await this.jiraService.isConfigured(organizationId))) {
       const fallback = this.jiraService.getFallbackProjectKey();
       if (
         fallback &&
@@ -212,7 +215,7 @@ export class ExtractedItemsService {
       );
     }
 
-    const projects = await this.jiraService.listProjects();
+    const projects = await this.jiraService.listProjects(organizationId);
     const exists = projects.some(
       (project) => project.key.toUpperCase() === normalized.toUpperCase(),
     );
@@ -232,7 +235,7 @@ export class ExtractedItemsService {
     item.jiraSyncError = message;
     const saved = await this.extractedItemRepository.save(item);
     return {
-      ...this.toResponse(saved),
+      ...(await this.toResponse(saved)),
       jiraError: message,
     };
   }
@@ -256,7 +259,7 @@ export class ExtractedItemsService {
     return item;
   }
 
-  private toResponse(item: ExtractedItem): ExtractedItemResponse {
+  private async toResponse(item: ExtractedItem): Promise<ExtractedItemResponse> {
     const projectConfidence = item.projectConfidence;
     const extractionConfidence = item.extractionConfidence;
 
@@ -271,7 +274,10 @@ export class ExtractedItemsService {
       status: item.status,
       jiraIssueKey: item.jiraIssueKey,
       jiraIssueUrl: item.jiraIssueKey
-        ? this.jiraService.getIssueBrowseUrl(item.jiraIssueKey)
+        ? await this.jiraService.getIssueBrowseUrl(
+            item.jiraIssueKey,
+            item.organizationId,
+          )
         : null,
       jiraSyncError: item.jiraSyncError,
       suggestedProjectKey: item.suggestedProjectKey,

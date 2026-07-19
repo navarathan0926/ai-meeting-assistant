@@ -22,6 +22,7 @@ import {
   PaginatedResponse,
   PaginationQueryDto,
 } from '../common/dto/pagination-query.dto';
+import { OrgScoped } from '../organizations/decorators/organization-scope.decorator';
 import type { Express } from 'express';
 
 @Auth()
@@ -60,6 +61,7 @@ export class MeetingsController {
     return buildPaginatedResponse(items, total, page, limit);
   }
 
+  @OrgScoped({ resource: 'meeting', param: 'id' })
   @Get(':id')
   async findOne(
     @CurrentUser() user: User,
@@ -68,6 +70,7 @@ export class MeetingsController {
     return this.meetingsService.findOne(user, id);
   }
 
+  @OrgScoped({ resource: 'meeting', param: 'id' })
   @Delete(':id')
   @HttpCode(HttpStatus.NO_CONTENT)
   async remove(

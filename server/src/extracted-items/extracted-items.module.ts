@@ -10,6 +10,7 @@ import { ItemExtractionProcessor } from './item-extraction.processor';
 import { AuthModule } from '../auth/auth.module';
 import { MeetingsModule } from '../meetings/meetings.module';
 import { JiraModule } from '../jira/jira.module';
+import { OrganizationsModule } from '../organizations/organizations.module';
 
 @Module({
   imports: [
@@ -24,6 +25,7 @@ import { JiraModule } from '../jira/jira.module';
     AuthModule,
     forwardRef(() => MeetingsModule),
     JiraModule,
+    OrganizationsModule,
   ],
   controllers: [ExtractedItemsController],
   providers: [

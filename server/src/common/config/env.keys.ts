@@ -25,6 +25,7 @@ export const EnvKey = {
   // Jira
   JiraApiGatewayUrl: 'JIRA_API_GATEWAY_URL',
   CloudId: 'CLOUD_ID',
+  JiraAccountId: 'JIRA_ACCOUNT_ID',
   JiraApiKey: 'JIRA_API_KEY',
   JiraEmail: 'JIRA_EMAIL',
   JiraProjectKey: 'JIRA_PROJECT_KEY',
@@ -54,6 +55,9 @@ export const EnvKey = {
   // Redis
   RedisUrl: 'REDIS_URL',
   RedisTlsRejectUnauthorized: 'REDIS_TLS_REJECT_UNAUTHORIZED',
+
+  // Credential encryption (Phase 11)
+  EncryptionKey: 'ENCRYPTION_KEY',
 } as const;
 
 export type EnvKeyName = (typeof EnvKey)[keyof typeof EnvKey];

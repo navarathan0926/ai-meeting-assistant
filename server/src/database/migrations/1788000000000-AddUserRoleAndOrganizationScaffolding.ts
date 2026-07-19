@@ -38,10 +38,10 @@ export class AddUserRoleAndOrganizationScaffolding1788000000000
       true,
     );
 
-    await queryRunner.manager.insert('organizations', {
-      id: DEFAULT_ORGANIZATION_ID,
-      name: 'Default Organization',
-    });
+    await queryRunner.query(
+      `INSERT INTO "organizations" ("id", "name") VALUES ($1, $2)`,
+      [DEFAULT_ORGANIZATION_ID, 'Default Organization'],
+    );
 
     await queryRunner.addColumn(
       'users',

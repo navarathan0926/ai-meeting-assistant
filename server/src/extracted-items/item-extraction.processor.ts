@@ -100,7 +100,9 @@ export class ItemExtractionProcessor extends WorkerHost {
       return;
     }
 
-    const projects = await this.jiraService.getProjectsForExtraction();
+    const projects = await this.jiraService.getProjectsForExtraction(
+      meeting.organizationId,
+    );
 
     const extraction = await this.extractItemsFromContent(
       meeting.transcription.text,
