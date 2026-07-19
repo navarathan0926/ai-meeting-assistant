@@ -45,12 +45,19 @@ privacy remains **owner + admin**.
   level (validation on user creation / update).
 
 ### 2. Organization entity expansion
-- Organization entity: add `jira_base_url`, `jira_auth_type` (`api_token`
-  first), `jira_email`, `jira_api_token` (encrypted ciphertext column),
-  `is_active`, `status`, `created_at`.
-- Project mappings / AI context: reuse Phase 9 `project_contexts`, add
-  `organizationId` (see section 7). Do not duplicate as a separate jsonb
-  blob unless you prefer it — table is fine.
+- Organization entity (per-org Jira connection):
+  - `jira_cloud_id` — Atlassian `CLOUD_ID` for this org's site
+  - `jira_account_id` — Atlassian account id (`/rest/api/3/myself`); populated on save/test
+  - `jira_email` — API user email for Basic auth
+  - `jira_api_token` — encrypted ciphertext column (`select: false`)
+  - `jira_auth_type` (`api_token` first)
+  - `is_active`, `status`, `created_at`
+- **Platform-wide env (same for all orgs):** `JIRA_API_GATEWAY_URL`, `JIRA_BASE_URL`
+  (browse links). Do **not** store these per organization.
+- **Multiple project keys per org:** no extra column — use Phase 9
+  `GET /api/jira/projects` + `project_contexts` scoped by `organizationId`
+  (unique on `(organizationId, projectKey)`). Optional env `JIRA_PROJECT_KEY`
+  remains a dev/fallback default only.
 
 ### 2a. Storing and retrieving org Jira credentials (sensitive data)
 
@@ -58,14 +65,30 @@ Each org may use a **different Jira Cloud account**. Org ADMINs enter
 credentials in the settings portal; the server persists them encrypted and
 loads them only when making Jira API calls for that org.
 
-**What to store (on `organizations` or a dedicated credentials table):**
+**What to store per organization (`organizations` table):**
 
 | Column | Stored as | Notes |
 |--------|-----------|-------|
-| `jira_base_url` | Plain text | e.g. `https://acme.atlassian.net` — not secret |
+| `jira_cloud_id` | Plain text | Atlassian cloud id (`CLOUD_ID`) — unique per org/site |
+| `jira_account_id` | Plain text | Atlassian account id; set from `/myself` on save/test |
 | `jira_email` | Plain text | Jira account email for Basic auth |
 | `jira_api_token` | **Encrypted ciphertext** | Never plain text in DB or logs |
 | `jira_auth_type` | Enum | Start with `api_token`; OAuth later if needed |
+
+**Platform-wide env (shared by all orgs — not in DB):**
+
+| Env var | Purpose |
+|---------|---------|
+| `JIRA_API_GATEWAY_URL` | Atlassian API gateway prefix |
+| `JIRA_BASE_URL` | Browse links in the UI (`/browse/{issueKey}`) |
+
+**Project keys (multiple per org — already handled):**
+
+- `GET /api/jira/projects` lists projects using the org's credentials.
+- `PUT /api/jira/projects/:key/context` stores AI context in
+  `project_contexts` keyed by `(organizationId, projectKey)`.
+- No per-org `JIRA_PROJECT_KEY` column; extraction picks from the org's
+  project list. Env `JIRA_PROJECT_KEY` is optional dev fallback only.
 
 **Encryption pattern** (see `docs/architecture/security.md`):
 
@@ -76,8 +99,10 @@ loads them only when making Jira API calls for that org.
 - Encryption key: env var `ENCRYPTION_KEY` (32-byte hex string). **Not**
   stored in the database. Document in `.env.example` and deployment docs.
 - On **save** (ADMIN updates Jira settings):
-  1. Validate DTO (URL format, email, non-empty token on create/rotate).
-  2. `encrypt(dto.jiraApiToken)` before `repository.save()`.
+  1. Validate DTO (cloud id, email, non-empty token on create/rotate).
+  2. Verify credentials against `JIRA_API_GATEWAY_URL/{cloudId}/rest/api/3/myself`.
+  3. Persist `jira_account_id` from the `/myself` response.
+  4. `encrypt(dto.jiraApiToken)` before `repository.save()`.
   3. Never return the decrypted token in API responses — use a masked
      placeholder (e.g. `"configured": true` or `"••••••••"`).
   4. Support token rotation: empty token in PATCH means "keep existing";
@@ -92,18 +117,18 @@ loads them only when making Jira API calls for that org.
 
 **API surface for org ADMIN settings:**
 
-- `GET /api/organizations/me/jira-config` — returns base URL, email,
-  `configured: boolean`; **no** API token.
-- `PUT /api/organizations/me/jira-config` — ADMIN only; accepts base URL,
-  email, and optional new API token; encrypts before save.
+- `GET /api/organizations/me/jira-config` — returns cloud id, account id,
+  email, `configured: boolean`; **no** API token.
+- `PUT /api/organizations/me/jira-config` — ADMIN only; accepts cloud id,
+  email, and optional new API token; verifies, encrypts, and saves.
 - `POST /api/organizations/me/jira-config/test` (optional) — verifies
   credentials against Jira before persisting.
 
 **Migration from env-based Jira (Phases 8–9):**
 
-- Copy current `JIRA_BASE_URL`, `JIRA_EMAIL`, `JIRA_API_KEY` into the
-  default organization's encrypted columns so existing deployments keep
-  working after migration.
+- Copy current `CLOUD_ID`, `JIRA_ACCOUNT_ID`, `JIRA_EMAIL`, and `JIRA_API_KEY`
+  into the default organization's columns (token encrypted with `ENCRYPTION_KEY`)
+  so existing deployments keep working after migration.
 - Keep env vars as a **fallback** only during transition if needed, but
   prefer org DB credentials as the single source of truth once Phase 11
   ships.
@@ -114,6 +139,27 @@ loads them only when making Jira API calls for that org.
 - Show "Token saved" indicator when `configured` is true.
 - All writes over HTTPS; no token in client `localStorage` beyond the
   session JWT.
+
+**Implementation rules (credentials + queries):**
+
+- Store `jira_api_token` on `Organization` with `@Column({ select: false })`.
+  Load it only via `createQueryBuilder().addSelect('organization.jiraApiToken')`
+  inside `OrganizationJiraService` — never via default `find()` / `findOne()`.
+- Encrypt with `encrypt()` from `server/src/common/utils/crypto.util.ts` before
+  `repository.save()`; decrypt only inside credential resolution, immediately
+  before building the HTTP Basic auth header.
+- Never return decrypted tokens in API responses, DTOs, or logs. Log Jira
+  failures with status codes and sanitized messages only (no auth headers).
+- Redis cache keys must be org-scoped (`jira:projects:{organizationId}:v1`).
+  Do not cache decrypted credentials.
+- **Migrations and data backfills:** prefer TypeORM migration APIs over raw SQL:
+  - `queryRunner.createTable`, `addColumn`, `changeColumn`, `createForeignKey`
+  - `queryRunner.manager.createQueryBuilder().update(...).set(...).execute()`
+  - `queryRunner.manager.insert(entity, values)` for seed rows
+  - Reserve `queryRunner.query()` for PostgreSQL-specific operations TypeORM
+    cannot express (e.g. `ALTER TYPE ... ADD VALUE` for enum values).
+- **Runtime queries:** use TypeORM `Repository` / `QueryBuilder` in services;
+  avoid string-concatenated SQL. Parameterize all dynamic values.
 
 ### 3. OrganizationGuard
 - Add a guard, separate from RolesGuard, that checks the requested
@@ -142,7 +188,8 @@ loads them only when making Jira API calls for that org.
 
 ### 6. Organization-scoped Jira configuration UI (for ADMIN)
 - Extend the existing settings page (ADMIN only) into the org admin portal:
-  Jira base URL, email, API token (password field — never echo stored token).
+  Jira cloud id, email, API token (password field — never echo stored token).
+  Browse links use platform `JIRA_BASE_URL` from env.
 - Fetch that org's Jira projects (`listProjects`, now using decrypted org
   credentials server-side).
 - Same page: edit `aiContext` per project (Phase 9 `project_contexts`, now

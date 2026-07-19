@@ -10,6 +10,7 @@ import { LoggerMiddleware } from './common/middleware/logger.middleware';
 import { ExtractionModule } from './extraction/extraction.module';
 import { AuthModule } from './auth/auth.module';
 import { ExtractedItemsModule } from './extracted-items/extracted-items.module';
+import { OrganizationsModule } from './organizations/organizations.module';
 import { RedisModule } from './common/redis/redis.module';
 import {
   configurations,
@@ -49,6 +50,7 @@ import { ConfigType } from '@nestjs/config';
     MeetingsModule,
     ExtractionModule,
     ExtractedItemsModule,
+    OrganizationsModule,
     AuthModule,
   ],
   controllers: [HealthController],

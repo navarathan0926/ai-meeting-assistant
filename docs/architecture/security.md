@@ -98,9 +98,9 @@ integration adapter credentials) must be encrypted at rest:
 - Decrypt only at the point of use; never log decrypted values.
 
 ```typescript
-// Pattern: server/src/common/utils/crypto.util.ts  (to be created)
-function encrypt(plaintext: string): string { /* AES-256-GCM */ }
-function decrypt(ciphertext: string): string { /* AES-256-GCM */ }
+// server/src/common/utils/crypto.util.ts
+function encrypt(plaintext: string, keyHex: string): string { /* AES-256-GCM */ }
+function decrypt(ciphertext: string, keyHex: string): string { /* AES-256-GCM */ }
 ```
 
 ---

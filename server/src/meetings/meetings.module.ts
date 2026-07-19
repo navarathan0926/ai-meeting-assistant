@@ -8,6 +8,7 @@ import { SummariesModule } from '../summaries/summaries.module';
 import { StorageModule } from '../storage/storage.module';
 import { ExtractionModule } from '../extraction/extraction.module';
 import { AuthModule } from '../auth/auth.module';
+import { OrganizationsModule } from '../organizations/organizations.module';
 
 @Module({
   imports: [
@@ -17,6 +18,7 @@ import { AuthModule } from '../auth/auth.module';
     StorageModule,
     forwardRef(() => ExtractionModule),
     AuthModule,
+    OrganizationsModule,
   ],
   controllers: [MeetingsController],
   providers: [MeetingsService],

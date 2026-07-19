@@ -12,24 +12,23 @@ import Redis from 'ioredis';
 import { ExtractedItemType } from '../extracted-items/enums/extracted-item-type.enum';
 import { ExtractedItemPriority } from '../extracted-items/enums/extracted-item-priority.enum';
 import {
-  isJiraConfigured,
   jiraConfiguration,
   JiraConfig,
   requireJiraApiGatewayUrl,
-  requireJiraCredentials,
 } from '../common/config/jira.config';
 import { normalizeBaseUrl } from '../common/config/env.helpers';
 import { isValidAdfDocument } from '../common/jira-document/blocks-to-adf';
 import { JiraAdfDocument } from '../common/jira-document/jira-document.types';
 import { REDIS_CLIENT } from '../common/redis/redis.constants';
 import { ProjectContext } from './entities/project-context.entity';
+import { OrganizationJiraService } from '../organizations/organization-jira.service';
+import { ResolvedJiraCredentials } from '../organizations/interfaces/organization-jira.interface';
 
 export interface JiraCreateIssueInput {
   type: ExtractedItemType;
   title: string;
   description: JiraAdfDocument;
   priority: ExtractedItemPriority;
-  /** Target Jira project key. Falls back to env `JIRA_PROJECT_KEY` when omitted. */
   projectKey?: string;
 }
 
@@ -65,7 +64,6 @@ interface JiraCreateMetaResponse {
   }>;
 }
 
-const PROJECTS_CACHE_KEY = 'jira:projects:v1';
 const CREATEMETA_CACHE_PREFIX = 'jira:createmeta:';
 const CREATEMETA_TTL_SECONDS = 30 * 60;
 
@@ -80,12 +78,13 @@ export class JiraService {
     @Inject(REDIS_CLIENT) private readonly redis: Redis,
     @InjectRepository(ProjectContext)
     private readonly projectContextRepository: Repository<ProjectContext>,
+    private readonly organizationJiraService: OrganizationJiraService,
   ) {
     this.config = jiraConfig;
   }
 
-  isConfigured(): boolean {
-    return isJiraConfigured(this.config);
+  async isConfigured(organizationId: string): Promise<boolean> {
+    return this.organizationJiraService.isConfigured(organizationId);
   }
 
   getFallbackProjectKey(): string | null {
@@ -93,48 +92,55 @@ export class JiraService {
     return key || null;
   }
 
-  getIssueBrowseUrl(issueKey: string): string | null {
+  async getIssueBrowseUrl(
+    issueKey: string,
+    _organizationId?: string,
+  ): Promise<string | null> {
     if (!this.config.baseUrl) {
       return null;
     }
-
     return `${normalizeBaseUrl(this.config.baseUrl)}/browse/${issueKey}`;
   }
 
-  async listProjects(options?: {
-    bypassCache?: boolean;
-  }): Promise<JiraProjectSummary[]> {
-    if (!this.isConfigured()) {
+  async listProjects(
+    organizationId: string,
+    options?: { bypassCache?: boolean },
+  ): Promise<JiraProjectSummary[]> {
+    const credentials =
+      await this.organizationJiraService.resolveForOrganization(organizationId);
+    if (!credentials) {
       throw new BadRequestException('Jira integration is not configured.');
     }
 
+    const cacheKey = this.projectsCacheKey(organizationId);
     if (!options?.bypassCache) {
-      const cached = await this.redis.get(PROJECTS_CACHE_KEY);
+      const cached = await this.redis.get(cacheKey);
       if (cached) {
         try {
           const parsed = JSON.parse(cached) as JiraProjectSummary[];
-          return this.mergeAiContexts(parsed);
+          return this.mergeAiContexts(organizationId, parsed);
         } catch {
-          await this.redis.del(PROJECTS_CACHE_KEY);
+          await this.redis.del(cacheKey);
         }
       }
     }
 
-    const projects = await this.fetchProjectsFromJira();
+    const projects = await this.fetchProjectsFromJira(credentials);
     await this.redis.setex(
-      PROJECTS_CACHE_KEY,
+      cacheKey,
       this.config.projectsCacheTtlSeconds,
       JSON.stringify(projects),
     );
 
-    return this.mergeAiContexts(projects);
+    return this.mergeAiContexts(organizationId, projects);
   }
 
-  async invalidateProjectsCache(): Promise<void> {
-    await this.redis.del(PROJECTS_CACHE_KEY);
+  async invalidateProjectsCache(organizationId: string): Promise<void> {
+    await this.redis.del(this.projectsCacheKey(organizationId));
   }
 
   async upsertProjectContext(
+    organizationId: string,
     projectKey: string,
     aiContext: string,
   ): Promise<JiraProjectSummary> {
@@ -143,7 +149,7 @@ export class JiraService {
       throw new BadRequestException('Project key is required.');
     }
 
-    const projects = await this.listProjects();
+    const projects = await this.listProjects(organizationId);
     const match = projects.find(
       (project) => project.key.toUpperCase() === normalizedKey,
     );
@@ -154,6 +160,7 @@ export class JiraService {
     }
 
     await this.projectContextRepository.save({
+      organizationId,
       projectKey: match.key,
       aiContext: aiContext.trim(),
     });
@@ -164,10 +171,12 @@ export class JiraService {
     };
   }
 
-  async getProjectsForExtraction(): Promise<
-    Array<{ key: string; name: string; aiContext: string }>
-  > {
-    if (!this.isConfigured()) {
+  async getProjectsForExtraction(
+    organizationId: string,
+  ): Promise<Array<{ key: string; name: string; aiContext: string }>> {
+    const configured =
+      await this.organizationJiraService.isConfigured(organizationId);
+    if (!configured) {
       const fallback = this.getFallbackProjectKey();
       if (!fallback) {
         return [];
@@ -176,7 +185,7 @@ export class JiraService {
     }
 
     try {
-      const projects = await this.listProjects();
+      const projects = await this.listProjects(organizationId);
       return projects.map((project) => ({
         key: project.key,
         name: project.name,
@@ -184,7 +193,7 @@ export class JiraService {
       }));
     } catch (error) {
       this.logger.warn(
-        `Failed to load Jira projects for extraction: ${(error as Error).message}`,
+        `Failed to load Jira projects for extraction (org ${organizationId}): ${(error as Error).message}`,
       );
       const fallback = this.getFallbackProjectKey();
       if (!fallback) {
@@ -194,11 +203,21 @@ export class JiraService {
     }
   }
 
-  async createIssue(input: JiraCreateIssueInput): Promise<JiraCreateIssueResult> {
-    const { cloudId, apiKey, email, projectKey: envProjectKey } =
-      requireJiraCredentials(this.config);
+  async createIssue(
+    organizationId: string,
+    input: JiraCreateIssueInput,
+  ): Promise<JiraCreateIssueResult> {
+    const credentials =
+      await this.organizationJiraService.resolveForOrganization(organizationId);
+    if (!credentials) {
+      throw new BadRequestException('Jira integration is not configured.');
+    }
 
-    const projectKey = (input.projectKey?.trim() || envProjectKey || '').trim();
+    const projectKey = (
+      input.projectKey?.trim() ||
+      this.getFallbackProjectKey() ||
+      ''
+    ).trim();
     if (!projectKey) {
       throw new BadRequestException(
         'No Jira project key resolved. Set a project on the item or configure JIRA_PROJECT_KEY.',
@@ -206,15 +225,14 @@ export class JiraService {
     }
 
     const issueTypeName = await this.resolveIssueTypeName(
+      organizationId,
       projectKey,
       input.type,
-      cloudId,
-      apiKey,
-      email,
+      credentials,
     );
 
-    const url = this.buildRestUrl('/rest/api/3/issue', cloudId);
-    const auth = Buffer.from(`${email}:${apiKey}`).toString('base64');
+    const url = this.buildRestUrl('/rest/api/3/issue', credentials.cloudId);
+    const auth = this.buildBasicAuth(credentials);
     const description = this.assertValidAdf(input.description);
 
     const body = {
@@ -228,7 +246,7 @@ export class JiraService {
     };
 
     this.logger.log(
-      `Creating Jira issue in project ${projectKey}: "${input.title}" (${issueTypeName})`,
+      `Creating Jira issue in project ${projectKey} (org ${organizationId}): "${input.title}" (${issueTypeName})`,
     );
 
     const response = await fetch(url, {
@@ -244,7 +262,7 @@ export class JiraService {
     if (!response.ok) {
       const errorBody = await response.text();
       this.logger.error(
-        `Jira issue creation failed (${response.status}): ${errorBody}`,
+        `Jira issue creation failed for org ${organizationId} (${response.status}): ${errorBody}`,
       );
       throw new InternalServerErrorException(
         `Failed to create Jira issue: ${this.extractErrorMessage(errorBody)}`,
@@ -266,15 +284,26 @@ export class JiraService {
     return description;
   }
 
-  private async fetchProjectsFromJira(): Promise<
+  private projectsCacheKey(organizationId: string): string {
+    return `jira:projects:${organizationId}:v1`;
+  }
+
+  private buildBasicAuth(credentials: ResolvedJiraCredentials): string {
+    return Buffer.from(`${credentials.email}:${credentials.apiKey}`).toString(
+      'base64',
+    );
+  }
+
+  private async fetchProjectsFromJira(
+    credentials: ResolvedJiraCredentials,
+  ): Promise<
     Array<{ key: string; name: string; description: string; aiContext: string }>
   > {
-    const { cloudId, apiKey, email } = requireJiraCredentials(this.config);
     const url = this.buildRestUrl(
       '/rest/api/3/project/search?maxResults=50',
-      cloudId,
+      credentials.cloudId,
     );
-    const auth = Buffer.from(`${email}:${apiKey}`).toString('base64');
+    const auth = this.buildBasicAuth(credentials);
 
     const response = await fetch(url, {
       method: 'GET',
@@ -287,7 +316,7 @@ export class JiraService {
     if (!response.ok) {
       const errorBody = await response.text();
       this.logger.error(
-        `Jira project search failed (${response.status}): ${errorBody}`,
+        `Jira project search failed for org ${credentials.organizationId} (${response.status}): ${errorBody}`,
       );
       throw new InternalServerErrorException(
         `Failed to list Jira projects: ${this.extractErrorMessage(errorBody)}`,
@@ -304,11 +333,14 @@ export class JiraService {
         aiContext: '',
       }));
 
-    this.logger.log(`Fetched ${projects.length} Jira project(s) from API.`);
+    this.logger.log(
+      `Fetched ${projects.length} Jira project(s) for org ${credentials.organizationId}.`,
+    );
     return projects;
   }
 
   private async mergeAiContexts(
+    organizationId: string,
     projects: Array<{
       key: string;
       name: string;
@@ -320,7 +352,9 @@ export class JiraService {
       return [];
     }
 
-    const contexts = await this.projectContextRepository.find();
+    const contexts = await this.projectContextRepository.find({
+      where: { organizationId },
+    });
     const contextByKey = new Map(
       contexts.map((entry) => [entry.projectKey.toUpperCase(), entry.aiContext]),
     );
@@ -341,18 +375,16 @@ export class JiraService {
   }
 
   private async resolveIssueTypeName(
+    organizationId: string,
     projectKey: string,
     type: ExtractedItemType,
-    cloudId: string,
-    apiKey: string,
-    email: string,
+    credentials: ResolvedJiraCredentials,
   ): Promise<string> {
     const preferred = this.mapIssueType(type);
     const available = await this.getCreateMetaIssueTypes(
+      organizationId,
       projectKey,
-      cloudId,
-      apiKey,
-      email,
+      credentials,
     );
 
     if (available.length === 0) {
@@ -389,12 +421,11 @@ export class JiraService {
   }
 
   private async getCreateMetaIssueTypes(
+    organizationId: string,
     projectKey: string,
-    cloudId: string,
-    apiKey: string,
-    email: string,
+    credentials: ResolvedJiraCredentials,
   ): Promise<string[]> {
-    const cacheKey = `${CREATEMETA_CACHE_PREFIX}${projectKey.toUpperCase()}`;
+    const cacheKey = `${CREATEMETA_CACHE_PREFIX}${organizationId}:${projectKey.toUpperCase()}`;
     const cached = await this.redis.get(cacheKey);
     if (cached) {
       try {
@@ -405,8 +436,8 @@ export class JiraService {
     }
 
     const path = `/rest/api/3/issue/createmeta?projectKeys=${encodeURIComponent(projectKey)}&expand=projects.issuetypes.fields`;
-    const url = this.buildRestUrl(path, cloudId);
-    const auth = Buffer.from(`${email}:${apiKey}`).toString('base64');
+    const url = this.buildRestUrl(path, credentials.cloudId);
+    const auth = this.buildBasicAuth(credentials);
 
     const response = await fetch(url, {
       method: 'GET',

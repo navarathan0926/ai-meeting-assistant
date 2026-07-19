@@ -41,13 +41,13 @@ export class JiraSendProcessor extends WorkerHost {
       return;
     }
 
-    if (!this.jiraService.isConfigured()) {
+    if (!(await this.jiraService.isConfigured(item.organizationId))) {
       await this.revertToDraft(item, 'Jira integration is not configured.');
       return;
     }
 
     try {
-      const result = await this.jiraService.createIssue({
+      const result = await this.jiraService.createIssue(item.organizationId, {
         type: item.type,
         title: item.title,
         description: item.description,

@@ -2,10 +2,19 @@ import { Test, TestingModule } from '@nestjs/testing';
 import { JiraController } from './jira.controller';
 import { JiraService } from './jira.service';
 import { UserRole } from '../auth/enums/user-role.enum';
+import { OrganizationsService } from '../organizations/organizations.service';
+import { DEFAULT_ORGANIZATION_ID } from '../organizations/organizations.constants';
+import { User } from '../auth/entities/user.entity';
 
 describe('JiraController', () => {
   let controller: JiraController;
   let jiraService: jest.Mocked<JiraService>;
+
+  const adminUser = {
+    id: 'user-1',
+    organizationId: DEFAULT_ORGANIZATION_ID,
+    role: UserRole.Admin,
+  } as User;
 
   beforeEach(async () => {
     const module: TestingModule = await Test.createTestingModule({
@@ -18,6 +27,14 @@ describe('JiraController', () => {
             upsertProjectContext: jest.fn(),
           },
         },
+        {
+          provide: OrganizationsService,
+          useValue: {
+            requireOrganizationId: jest
+              .fn()
+              .mockReturnValue(DEFAULT_ORGANIZATION_ID),
+          },
+        },
       ],
     }).compile();
 
@@ -25,10 +42,13 @@ describe('JiraController', () => {
     jiraService = module.get(JiraService);
   });
 
-  it('should list projects', async () => {
+  it('should list projects for the user organization', async () => {
     jiraService.listProjects.mockResolvedValue([]);
 
-    await expect(controller.listProjects()).resolves.toEqual([]);
+    await expect(controller.listProjects(adminUser)).resolves.toEqual([]);
+    expect(jiraService.listProjects).toHaveBeenCalledWith(
+      DEFAULT_ORGANIZATION_ID,
+    );
   });
 
   it('should update project context', async () => {
@@ -39,11 +59,16 @@ describe('JiraController', () => {
       aiContext: 'Updated',
     });
 
-    const result = await controller.updateProjectContext('PROJ', {
+    const result = await controller.updateProjectContext(adminUser, 'PROJ', {
       aiContext: 'Updated',
     });
 
     expect(result.aiContext).toBe('Updated');
+    expect(jiraService.upsertProjectContext).toHaveBeenCalledWith(
+      DEFAULT_ORGANIZATION_ID,
+      'PROJ',
+      'Updated',
+    );
   });
 
   it('should require admin role on updateProjectContext', () => {

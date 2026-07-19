@@ -9,6 +9,8 @@ import { blocksToAdf } from '../common/jira-document/blocks-to-adf';
 import { JiraAdfDocument } from '../common/jira-document/jira-document.types';
 import { REDIS_CLIENT } from '../common/redis/redis.constants';
 import { ProjectContext } from './entities/project-context.entity';
+import { OrganizationJiraService } from '../organizations/organization-jira.service';
+import { DEFAULT_ORGANIZATION_ID } from '../organizations/organizations.constants';
 
 const sampleDescription: JiraAdfDocument = blocksToAdf([
   { type: 'heading', level: 2, text: 'Context' },
@@ -32,11 +34,29 @@ describe('JiraService', () => {
     setex: jest.fn().mockResolvedValue('OK'),
     del: jest.fn().mockResolvedValue(1),
   };
+  const organizationJiraServiceMock = {
+    isConfigured: jest.fn().mockResolvedValue(true),
+    resolveForOrganization: jest.fn().mockResolvedValue({
+      organizationId: DEFAULT_ORGANIZATION_ID,
+      cloudId: 'cloud-123',
+      email: 'user@example.com',
+      apiKey: 'token-abc',
+      accountId: 'account-123',
+    }),
+  };
 
   beforeEach(async () => {
     jest.clearAllMocks();
     global.fetch = fetchMock;
     redisMock.get.mockResolvedValue(null);
+    organizationJiraServiceMock.isConfigured.mockResolvedValue(true);
+    organizationJiraServiceMock.resolveForOrganization.mockResolvedValue({
+      organizationId: DEFAULT_ORGANIZATION_ID,
+      cloudId: 'cloud-123',
+      email: 'user@example.com',
+      apiKey: 'token-abc',
+      accountId: 'account-123',
+    });
 
     const module: TestingModule = await Test.createTestingModule({
       providers: [
@@ -50,6 +70,10 @@ describe('JiraService', () => {
             save: jest.fn().mockImplementation((entity) => Promise.resolve(entity)),
           },
         },
+        {
+          provide: OrganizationJiraService,
+          useValue: organizationJiraServiceMock,
+        },
       ],
     }).compile();
 
@@ -57,16 +81,21 @@ describe('JiraService', () => {
   });
 
   describe('isConfigured', () => {
-    it('should return true when required env vars are present', () => {
-      expect(service.isConfigured()).toBe(true);
+    it('should delegate to organization Jira service', async () => {
+      await expect(
+        service.isConfigured(DEFAULT_ORGANIZATION_ID),
+      ).resolves.toBe(true);
+      expect(organizationJiraServiceMock.isConfigured).toHaveBeenCalledWith(
+        DEFAULT_ORGANIZATION_ID,
+      );
     });
   });
 
   describe('getIssueBrowseUrl', () => {
-    it('should build a browse URL from JIRA_BASE_URL', () => {
-      expect(service.getIssueBrowseUrl('PROJ-42')).toBe(
-        'https://example.atlassian.net/browse/PROJ-42',
-      );
+    it('should build a browse URL from org credentials', async () => {
+      await expect(
+        service.getIssueBrowseUrl('PROJ-42', DEFAULT_ORGANIZATION_ID),
+      ).resolves.toBe('https://example.atlassian.net/browse/PROJ-42');
     });
   });
 
@@ -130,7 +159,7 @@ describe('JiraService', () => {
     it('should POST ADF description to the Jira gateway and return issue key', async () => {
       mockCreateMetaThenCreate({ ok: true, id: '10001', key: 'PROJ-42' });
 
-      const result = await service.createIssue({
+      const result = await service.createIssue(DEFAULT_ORGANIZATION_ID, {
         type: ExtractedItemType.Bug,
         title: 'Login fails on mobile',
         description: sampleDescription,
@@ -163,7 +192,7 @@ describe('JiraService', () => {
     it('should use the provided projectKey override', async () => {
       mockCreateMetaThenCreate({ ok: true, id: '10002', key: 'OTHER-1' });
 
-      await service.createIssue({
+      await service.createIssue(DEFAULT_ORGANIZATION_ID, {
         type: ExtractedItemType.Task,
         title: 'Task',
         description: sampleDescription,
@@ -183,7 +212,7 @@ describe('JiraService', () => {
     it('should send table nodes in ADF description', async () => {
       mockCreateMetaThenCreate({ ok: true, id: '10001', key: 'PROJ-43' });
 
-      await service.createIssue({
+      await service.createIssue(DEFAULT_ORGANIZATION_ID, {
         type: ExtractedItemType.Task,
         title: 'Task with table',
         description: tableDescription,
@@ -207,7 +236,7 @@ describe('JiraService', () => {
       });
 
       await expect(
-        service.createIssue({
+        service.createIssue(DEFAULT_ORGANIZATION_ID, {
           type: ExtractedItemType.Task,
           title: 'Task',
           description: sampleDescription,

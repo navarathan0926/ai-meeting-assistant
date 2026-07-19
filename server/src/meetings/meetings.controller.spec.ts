@@ -7,6 +7,7 @@ import { User } from '../auth/entities/user.entity';
 
 import { UserRole } from '../auth/enums/user-role.enum';
 import { DEFAULT_ORGANIZATION_ID } from '../organizations/organizations.constants';
+import { OrganizationGuard } from '../organizations/guards/organization.guard';
 
 const TEST_USER: User = {
   id: 'user-uuid-1',
@@ -68,7 +69,10 @@ describe('MeetingsController', () => {
           },
         },
       ],
-    }).compile();
+    })
+      .overrideGuard(OrganizationGuard)
+      .useValue({ canActivate: jest.fn().mockResolvedValue(true) })
+      .compile();
 
     controller = module.get<MeetingsController>(MeetingsController);
     meetingsService = module.get(MeetingsService);

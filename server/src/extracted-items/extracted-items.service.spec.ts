@@ -103,8 +103,8 @@ describe('ExtractedItemsService', () => {
           provide: JiraService,
           useValue: {
             createIssue: jest.fn(),
-            getIssueBrowseUrl: jest.fn().mockReturnValue(null),
-            isConfigured: jest.fn().mockReturnValue(true),
+            getIssueBrowseUrl: jest.fn().mockResolvedValue(null),
+            isConfigured: jest.fn().mockResolvedValue(true),
             getFallbackProjectKey: jest.fn().mockReturnValue('PROJ'),
             listProjects: jest.fn().mockResolvedValue([
               { key: 'PROJ', name: 'Project', description: '', aiContext: 'Project' },

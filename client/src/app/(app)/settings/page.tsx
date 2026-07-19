@@ -2,6 +2,7 @@
 
 import Link from 'next/link';
 import { ProjectContextSettings } from '@/components/settings/ProjectContextSettings';
+import { JiraConfigSettings } from '@/components/settings/JiraConfigSettings';
 import { useAuthContext } from '@/providers/AuthProvider';
 
 export default function SettingsPage() {
@@ -45,10 +46,19 @@ export default function SettingsPage() {
             <h2 className="text-xl font-semibold text-white/90">Settings</h2>
             <p className="mt-1 text-sm text-white/45">
               {isAdmin
-                ? 'Configure Jira project context used during item extraction.'
-                : 'Jira project context is managed by organization admins.'}
+                ? 'Configure your organization Jira account and project AI context.'
+                : 'Jira settings are managed by organization admins.'}
             </p>
           </div>
+
+          {isAdmin ? (
+            <section className="rounded-2xl border border-white/10 bg-white/5 p-5">
+              <h3 className="font-semibold text-white/90 text-sm uppercase tracking-wide mb-4">
+                Jira credentials
+              </h3>
+              <JiraConfigSettings />
+            </section>
+          ) : null}
 
           <section className="rounded-2xl border border-white/10 bg-white/5 p-5">
             <h3 className="font-semibold text-white/90 text-sm uppercase tracking-wide mb-4">

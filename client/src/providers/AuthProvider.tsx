@@ -23,7 +23,7 @@ interface AuthContextValue {
 
 const AuthContext = createContext<AuthContextValue | null>(null);
 
-const AUTH_PATH_PREFIXES = ['/login', '/register', '/dashboard'];
+const AUTH_PATH_PREFIXES = ['/login', '/register', '/dashboard', '/settings', '/superadmin'];
 
 function pathNeedsAuthBootstrap(pathname: string): boolean {
   return AUTH_PATH_PREFIXES.some((prefix) => pathname.startsWith(prefix));

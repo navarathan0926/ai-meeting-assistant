@@ -24,6 +24,14 @@ export default function DashboardPage() {
           <h1 className="font-bold text-lg tracking-tight">AI Meeting Assistant</h1>
         </Link>
         <div className="ml-auto flex items-center gap-4">
+          {user?.role === 'SUPERADMIN' ? (
+            <Link
+              href="/superadmin"
+              className="text-xs text-amber-200/80 hover:text-amber-100 transition-colors"
+            >
+              Platform admin
+            </Link>
+          ) : null}
           <Link
             href="/settings"
             className="text-xs text-white/60 hover:text-white transition-colors"

@@ -7,6 +7,7 @@ import { ExtractedItemStatus } from './enums/extracted-item-status.enum';
 import { User } from '../auth/entities/user.entity';
 import { UserRole } from '../auth/enums/user-role.enum';
 import { DEFAULT_ORGANIZATION_ID } from '../organizations/organizations.constants';
+import { OrganizationGuard } from '../organizations/guards/organization.guard';
 import { blocksToAdf } from '../common/jira-document/blocks-to-adf';
 
 const sampleAdf = blocksToAdf([{ type: 'paragraph', text: 'Details' }]);
@@ -42,7 +43,10 @@ describe('ExtractedItemsController', () => {
           },
         },
       ],
-    }).compile();
+    })
+      .overrideGuard(OrganizationGuard)
+      .useValue({ canActivate: jest.fn().mockResolvedValue(true) })
+      .compile();
 
     controller = module.get(ExtractedItemsController);
     service = module.get(ExtractedItemsService);

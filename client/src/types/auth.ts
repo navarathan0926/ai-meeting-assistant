@@ -1,6 +1,6 @@
 export const ACCESS_TOKEN_KEY = 'access_token';
 
-export type UserRole = 'USER' | 'ADMIN';
+export type UserRole = 'USER' | 'ADMIN' | 'SUPERADMIN';
 
 export interface AuthUser {
   id: string;

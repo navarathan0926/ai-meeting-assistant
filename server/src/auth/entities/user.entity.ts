@@ -39,10 +39,10 @@ export class User {
   @Column({ type: 'enum', enum: UserRole, default: UserRole.User })
   role: UserRole;
 
-  @Column()
-  organizationId: string;
+  @Column({ nullable: true })
+  organizationId: string | null;
 
-  @ManyToOne(() => Organization, { nullable: false, onDelete: 'RESTRICT' })
+  @ManyToOne(() => Organization, { nullable: true, onDelete: 'RESTRICT' })
   @JoinColumn({ name: 'organizationId' })
   organization?: Organization;
 

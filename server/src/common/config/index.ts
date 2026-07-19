@@ -6,6 +6,7 @@ import { jiraConfiguration } from './jira.config';
 import { openAiConfiguration } from './openai.config';
 import { redisConfiguration } from './redis.config';
 import { extractionConfiguration } from './extraction.config';
+import { encryptionConfiguration } from './encryption.config';
 
 export { EnvKey } from './env.keys';
 export type { EnvKeyName } from './env.keys';
@@ -44,6 +45,12 @@ export {
   buildRedisConfig,
   type RedisConfig,
 } from './redis.config';
+export {
+  encryptionConfiguration,
+  buildEncryptionConfig,
+  requireEncryptionKey,
+  type EncryptionConfig,
+} from './encryption.config';
 
 /** All typed config namespaces loaded once at startup. */
 export const configurations = [
@@ -55,4 +62,5 @@ export const configurations = [
   azureStorageConfiguration,
   authConfiguration,
   redisConfiguration,
+  encryptionConfiguration,
 ];

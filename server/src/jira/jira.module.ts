@@ -8,6 +8,7 @@ import { JiraSendService } from './jira-send.service';
 import { JiraSendProcessor } from './jira-send.processor';
 import { JiraController } from './jira.controller';
 import { AuthModule } from '../auth/auth.module';
+import { OrganizationsModule } from '../organizations/organizations.module';
 
 @Module({
   imports: [
@@ -20,6 +21,7 @@ import { AuthModule } from '../auth/auth.module';
     }),
     TypeOrmModule.forFeature([ExtractedItem, ProjectContext]),
     AuthModule,
+    OrganizationsModule,
   ],
   controllers: [JiraController],
   providers: [JiraService, JiraSendService, JiraSendProcessor],
