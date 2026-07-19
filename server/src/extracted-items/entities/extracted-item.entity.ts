@@ -8,6 +8,7 @@ import {
   UpdateDateColumn,
 } from 'typeorm';
 import { Meeting } from '../../meetings/entities/meeting.entity';
+import { Organization } from '../../organizations/entities/organization.entity';
 import { ExtractedItemType } from '../enums/extracted-item-type.enum';
 import { ExtractedItemPriority } from '../enums/extracted-item-priority.enum';
 import { ExtractedItemStatus } from '../enums/extracted-item-status.enum';
@@ -27,6 +28,13 @@ export class ExtractedItem {
   })
   @JoinColumn({ name: 'meetingId' })
   meeting: Meeting;
+
+  @Column()
+  organizationId: string;
+
+  @ManyToOne(() => Organization, { nullable: false, onDelete: 'RESTRICT' })
+  @JoinColumn({ name: 'organizationId' })
+  organization?: Organization;
 
   @Column({ type: 'enum', enum: ExtractedItemType })
   type: ExtractedItemType;

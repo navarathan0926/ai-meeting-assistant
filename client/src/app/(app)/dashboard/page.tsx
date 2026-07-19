@@ -32,6 +32,11 @@ export default function DashboardPage() {
           </Link>
           <span className="text-xs text-white/50 font-mono hidden sm:inline">
             Signed in as <span className="text-[#39FF14]">{user?.name}</span>
+            {user?.role && (
+              <span className="ml-2 rounded px-1.5 py-0.5 text-[10px] uppercase tracking-wide bg-white/10 text-white/60">
+                {user.role}
+              </span>
+            )}
           </span>
           <button
             onClick={() => void logout()}

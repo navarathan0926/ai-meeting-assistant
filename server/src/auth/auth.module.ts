@@ -13,6 +13,7 @@ import { JwtStrategy } from './strategies/jwt.strategy';
 import { GoogleStrategy } from './strategies/google.strategy';
 import { GoogleOauthGuard } from './guards/google-oauth.guard';
 import { AuthGuard } from '../common/guards/auth.guard';
+import { RolesGuard } from '../common/guards/roles.guard';
 import { authConfiguration } from '../common/config/auth.config';
 
 @Module({
@@ -37,6 +38,7 @@ import { authConfiguration } from '../common/config/auth.config';
     GoogleStrategy,
     GoogleOauthGuard,
     AuthGuard,
+    RolesGuard,
   ],
   controllers: [AuthController],
   exports: [
@@ -44,6 +46,7 @@ import { authConfiguration } from '../common/config/auth.config';
     JwtStrategy,
     GoogleStrategy,
     AuthGuard,
+    RolesGuard,
     PassportModule,
     JwtModule,
   ],

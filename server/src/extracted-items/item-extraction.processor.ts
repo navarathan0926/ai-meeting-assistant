@@ -146,6 +146,7 @@ export class ItemExtractionProcessor extends WorkerHost {
 
       return this.extractedItemRepository.create({
         meetingId,
+        organizationId: meeting.organizationId,
         type: this.parseType(item.type),
         title: item.title.trim(),
         description: rawBlocksToAdf(item.description_blocks),

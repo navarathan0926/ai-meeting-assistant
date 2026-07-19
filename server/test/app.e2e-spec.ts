@@ -36,6 +36,7 @@ const SAMPLE_MEETING: Meeting = {
   status: MeetingStatus.PENDING,
   errorMessage: null,
   userId: TEST_USER_ID,
+  organizationId: '00000000-0000-4000-8000-000000000001',
   user: null as any,
   transcription: null,
   summary: null,
@@ -52,7 +53,7 @@ const mockMeetingsService = {
   findAll: jest.fn().mockResolvedValue({ items: [], total: 0 }),
   findOne: jest.fn(),
   deleteMeeting: jest.fn().mockResolvedValue(undefined),
-  assertOwned: jest.fn().mockResolvedValue(undefined),
+  assertAccessible: jest.fn().mockResolvedValue({ id: 'meeting-1' }),
 };
 
 const mockExtractionQueue = {
@@ -351,14 +352,14 @@ describe('App (E2E Integration)', () => {
         attemptsMade: 1,
       };
       mockExtractionQueue.getJob.mockResolvedValue(mockJob);
-      mockMeetingsService.assertOwned.mockResolvedValue(undefined);
+      mockMeetingsService.assertAccessible.mockResolvedValue({ id: VALID_UUID });
 
       const res = await request(app.getHttpServer()).get(
         '/api/extraction/job-123/status',
       );
 
-      expect(mockMeetingsService.assertOwned).toHaveBeenCalledWith(
-        TEST_USER_ID,
+      expect(mockMeetingsService.assertAccessible).toHaveBeenCalledWith(
+        expect.objectContaining({ id: TEST_USER_ID }),
         VALID_UUID,
       );
       expect(res.status).toBe(200);

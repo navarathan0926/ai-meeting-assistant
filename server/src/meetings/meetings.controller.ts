@@ -41,7 +41,7 @@ export class MeetingsController {
     @CurrentUser() user: User,
     @UploadedFile() file: Express.Multer.File,
   ): Promise<MeetingResponse> {
-    return this.meetingsService.createFromUpload(file, user.id);
+    return this.meetingsService.createFromUpload(file, user);
   }
 
   @Get()
@@ -51,7 +51,7 @@ export class MeetingsController {
   ): Promise<PaginatedResponse<MeetingResponse>> {
     const page = query.page ?? 1;
     const limit = query.limit ?? 20;
-    const { items, total } = await this.meetingsService.findAll(user.id, {
+    const { items, total } = await this.meetingsService.findAll(user, {
       page,
       limit,
       search: query.search,
@@ -65,7 +65,7 @@ export class MeetingsController {
     @CurrentUser() user: User,
     @Param('id', ParseUUIDPipe) id: string,
   ): Promise<MeetingResponse> {
-    return this.meetingsService.findOne(user.id, id);
+    return this.meetingsService.findOne(user, id);
   }
 
   @Delete(':id')
@@ -74,6 +74,6 @@ export class MeetingsController {
     @CurrentUser() user: User,
     @Param('id', ParseUUIDPipe) id: string,
   ): Promise<void> {
-    return this.meetingsService.deleteMeeting(user.id, id);
+    return this.meetingsService.deleteMeeting(user, id);
   }
 }

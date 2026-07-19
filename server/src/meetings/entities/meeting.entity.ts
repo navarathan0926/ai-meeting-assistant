@@ -13,6 +13,7 @@ import { MeetingStatus } from '../enums/meeting-status.enum';
 import { Transcription } from '../../transcriptions/entities/transcription.entity';
 import { Summary } from '../../summaries/entities/summary.entity';
 import { User } from '../../auth/entities/user.entity';
+import { Organization } from '../../organizations/entities/organization.entity';
 import { ExtractedItem } from '../../extracted-items/entities/extracted-item.entity';
 import { ExtractionAnalysis } from '../interfaces/extraction-analysis.interface';
 
@@ -42,6 +43,13 @@ export class Meeting {
 
   @Column()
   userId: string;
+
+  @Column()
+  organizationId: string;
+
+  @ManyToOne(() => Organization, { nullable: false, onDelete: 'RESTRICT' })
+  @JoinColumn({ name: 'organizationId' })
+  organization?: Organization;
 
   @ManyToOne(() => User, (user) => user.meetings, {
     nullable: false,

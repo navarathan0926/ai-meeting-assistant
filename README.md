@@ -82,7 +82,7 @@ npm run dev                   # Starts on http://localhost:3000
 | 7     | Security & Performance                        | ✅ Done     |
 | 8     | Jira Draft Extraction & Approval              | ✅ Done     |
 | 9     | Multi-Project Jira & AI Project Selection     | 🔜 Planned  |
-| 10    | Roles (USER / ADMIN) & Approval Permissions   | 🔜 Planned  |
+| 10    | Roles (USER / ADMIN) & Approval Permissions   | ✅ Done     |
 | 11    | SUPERADMIN & Multi-Organization Support       | 🔜 Planned  |
 | 12    | Meeting Platform Integration (Zoom)           | 🔜 Planned  |
 | 13    | MCP & Existing Issue Lookup                   | 🔜 Planned  |

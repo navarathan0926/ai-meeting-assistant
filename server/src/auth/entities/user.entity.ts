@@ -6,8 +6,12 @@ import {
   UpdateDateColumn,
   Index,
   OneToMany,
+  ManyToOne,
+  JoinColumn,
 } from 'typeorm';
 import { Meeting } from '../../meetings/entities/meeting.entity';
+import { Organization } from '../../organizations/entities/organization.entity';
+import { UserRole } from '../enums/user-role.enum';
 
 export type AuthProvider = 'local' | 'google';
 
@@ -31,6 +35,16 @@ export class User {
 
   @Column({ type: 'varchar', nullable: true })
   googleId: string | null;
+
+  @Column({ type: 'enum', enum: UserRole, default: UserRole.User })
+  role: UserRole;
+
+  @Column()
+  organizationId: string;
+
+  @ManyToOne(() => Organization, { nullable: false, onDelete: 'RESTRICT' })
+  @JoinColumn({ name: 'organizationId' })
+  organization?: Organization;
 
   @OneToMany(() => Meeting, (meeting) => meeting.user)
   meetings: Meeting[];

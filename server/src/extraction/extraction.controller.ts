@@ -33,7 +33,7 @@ export class ExtractionController {
       );
     }
 
-    await this.meetingsService.assertOwned(user.id, job.data.meetingId);
+    await this.meetingsService.assertAccessible(user, job.data.meetingId);
 
     const state = await job.getState();
 

@@ -9,6 +9,8 @@ import { Repository } from 'typeorm';
 import { JwtService } from '@nestjs/jwt';
 import * as bcrypt from 'bcryptjs';
 import { User } from './entities/user.entity';
+import { UserRole } from './enums/user-role.enum';
+import { DEFAULT_ORGANIZATION_ID } from '../organizations/organizations.constants';
 import { RegisterDto } from './dto/register.dto';
 import { LoginDto } from './dto/login.dto';
 import { AuthOauthCodeService } from './auth-oauth-code.service';
@@ -25,6 +27,7 @@ export interface AuthResult {
     email: string;
     name: string;
     provider: string;
+    role: UserRole;
   };
 }
 
@@ -60,6 +63,8 @@ export class AuthService {
       email: dto.email.toLowerCase(),
       passwordHash,
       provider: 'local',
+      role: UserRole.User,
+      organizationId: DEFAULT_ORGANIZATION_ID,
     });
     await this.userRepository.save(user);
 
@@ -124,6 +129,8 @@ export class AuthService {
           googleId: profile.googleId,
           provider: 'google',
           passwordHash: null,
+          role: UserRole.User,
+          organizationId: DEFAULT_ORGANIZATION_ID,
         });
         await this.userRepository.save(user);
       }
@@ -181,6 +188,7 @@ export class AuthService {
         email: user.email,
         name: user.name,
         provider: user.provider,
+        role: user.role,
       },
     };
   }
