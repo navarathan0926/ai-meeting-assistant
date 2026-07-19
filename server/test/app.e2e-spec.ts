@@ -21,12 +21,18 @@ import { AllExceptionsFilter } from '../src/common/filters/http-exception.filter
 import { ExtractionController } from '../src/extraction/extraction.controller';
 import { NotFoundException } from '@nestjs/common';
 import { AuthGuard } from '../src/common/guards/auth.guard';
+import { OrganizationGuard } from '../src/organizations/guards/organization.guard';
 
 // ── Mock data ──────────────────────────────────────────────────────────────────
 
 const VALID_UUID = 'a1b2c3d4-e5f6-7890-abcd-ef1234567890';
 const INVALID_UUID = 'not-a-valid-uuid';
 const TEST_USER_ID = 'b2c3d4e5-f6a7-8901-bcde-f12345678901';
+const TEST_USER = {
+  id: TEST_USER_ID,
+  email: 'test@example.com',
+  name: 'Test User',
+};
 
 const SAMPLE_MEETING: Meeting = {
   id: VALID_UUID,
@@ -97,14 +103,12 @@ async function createTestApp(): Promise<INestApplication> {
     .useValue({
       canActivate: (context) => {
         const req = context.switchToHttp().getRequest();
-        req.user = {
-          id: TEST_USER_ID,
-          email: 'test@example.com',
-          name: 'Test User',
-        };
+        req.user = TEST_USER;
         return true;
       },
     })
+    .overrideGuard(OrganizationGuard)
+    .useValue({ canActivate: jest.fn().mockResolvedValue(true) })
     .compile();
 
   const app = moduleFixture.createNestApplication();
@@ -202,7 +206,7 @@ describe('App (E2E Integration)', () => {
 
       await request(app.getHttpServer()).get('/api/meetings?search=standup');
 
-      expect(mockMeetingsService.findAll).toHaveBeenCalledWith(TEST_USER_ID, {
+      expect(mockMeetingsService.findAll).toHaveBeenCalledWith(TEST_USER, {
         page: 1,
         limit: 20,
         search: 'standup',
