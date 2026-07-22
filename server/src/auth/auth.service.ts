@@ -3,6 +3,7 @@ import {
   ConflictException,
   UnauthorizedException,
   NotFoundException,
+  ForbiddenException,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
@@ -14,6 +15,8 @@ import { DEFAULT_ORGANIZATION_ID } from '../organizations/organizations.constant
 import { RegisterDto } from './dto/register.dto';
 import { LoginDto } from './dto/login.dto';
 import { AuthOauthCodeService } from './auth-oauth-code.service';
+import { PlatformSettingsService } from '../platform-settings/platform-settings.service';
+import { PublicAuthConfigResponse } from '../platform-settings/interfaces/platform-settings-response.interface';
 
 export interface JwtPayload {
   sub: string;
@@ -38,11 +41,21 @@ export class AuthService {
     private readonly userRepository: Repository<User>,
     private readonly jwtService: JwtService,
     private readonly oauthCodeService: AuthOauthCodeService,
+    private readonly platformSettingsService: PlatformSettingsService,
   ) {}
+
+  async getPublicConfig(): Promise<PublicAuthConfigResponse> {
+    return {
+      allowPublicSignup:
+        await this.platformSettingsService.isPublicSignupAllowed(),
+    };
+  }
 
   // ─── Register ────────────────────────────────────────────────────────────────
 
   async register(dto: RegisterDto): Promise<AuthResult> {
+    await this.assertPublicSignupAllowed();
+
     const existing = await this.userRepository.findOne({
       where: { email: dto.email.toLowerCase() },
     });
@@ -65,6 +78,7 @@ export class AuthService {
       provider: 'local',
       role: UserRole.User,
       organizationId: DEFAULT_ORGANIZATION_ID,
+      isActive: true,
     });
     await this.userRepository.save(user);
 
@@ -83,6 +97,8 @@ export class AuthService {
     if (!user) {
       throw new UnauthorizedException('Invalid email or password.');
     }
+
+    this.assertUserIsActive(user);
 
     if (!user.passwordHash) {
       if (user.googleId) {
@@ -120,9 +136,12 @@ export class AuthService {
       });
 
       if (user) {
+        this.assertUserIsActive(user);
         user.googleId = profile.googleId;
         await this.userRepository.save(user);
       } else {
+        await this.assertPublicSignupAllowed();
+
         user = this.userRepository.create({
           name: profile.name,
           email: profile.email.toLowerCase(),
@@ -131,9 +150,12 @@ export class AuthService {
           passwordHash: null,
           role: UserRole.User,
           organizationId: DEFAULT_ORGANIZATION_ID,
+          isActive: true,
         });
         await this.userRepository.save(user);
       }
+    } else {
+      this.assertUserIsActive(user);
     }
 
     return this.buildAuthResult(user);
@@ -165,6 +187,7 @@ export class AuthService {
     }
 
     const user = await this.validateById(payload.sub);
+    this.assertUserIsActive(user);
     return this.buildAuthResult(user);
   }
 
@@ -176,7 +199,22 @@ export class AuthService {
     return user;
   }
 
-  // ─── Helpers ─────────────────────────────────────────────────────────────────
+  // ─── Helpers ───────────────────────────────────────────────────────────────
+
+  private async assertPublicSignupAllowed(): Promise<void> {
+    const allowed = await this.platformSettingsService.isPublicSignupAllowed();
+    if (!allowed) {
+      throw new ForbiddenException('Public registration is disabled.');
+    }
+  }
+
+  private assertUserIsActive(user: User): void {
+    if (user.isActive === false) {
+      throw new ForbiddenException(
+        'This account has been suspended. Contact your organization admin.',
+      );
+    }
+  }
 
   private buildAuthResult(user: User): AuthResult {
     const payload: JwtPayload = { sub: user.id, email: user.email };

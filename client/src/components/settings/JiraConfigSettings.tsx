@@ -1,6 +1,7 @@
 'use client';
 
 import { FormEvent, useEffect, useState } from 'react';
+import { getUserFacingErrorMessage } from '@/lib/api/auth-errors';
 import {
   useJiraConfig,
   useTestJiraConfig,
@@ -50,7 +51,7 @@ export function JiraConfigSettings() {
   if (isError) {
     return (
       <p className="text-sm text-red-200">
-        {error.message || 'Failed to load Jira configuration.'}
+        {getUserFacingErrorMessage(error, 'Could not load Jira settings. Please try again.')}
       </p>
     );
   }

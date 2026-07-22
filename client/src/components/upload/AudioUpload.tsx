@@ -3,6 +3,7 @@
 import { useCallback, useState, useEffect } from 'react';
 import { MeetingStatus } from '@/types/meeting';
 import { useUploadMeeting, useMeeting } from '@/hooks/useMeeting';
+import { getUserFacingErrorMessage } from '@/lib/api/auth-errors';
 import { useToast } from '@/providers/ToastProvider';
 
 interface AudioUploadProps {
@@ -86,7 +87,7 @@ export function AudioUpload({ onComplete }: AudioUploadProps) {
       showToast('Recording uploaded! Processing started...', 'success');
       // onComplete fires when the polling hook sees a terminal status
     } catch (err) {
-      showToast((err as Error).message || 'Failed to upload recording.', 'error');
+      showToast(getUserFacingErrorMessage(err, 'Failed to upload recording.'), 'error');
     }
   };
 
@@ -188,7 +189,7 @@ export function AudioUpload({ onComplete }: AudioUploadProps) {
       {/* Upload error */}
       {upload.isError && (
         <p className="text-red-400 text-sm text-center">
-          {(upload.error as Error).message}
+          {getUserFacingErrorMessage(upload.error, 'Upload failed. Please try again.')}
         </p>
       )}
 

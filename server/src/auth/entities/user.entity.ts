@@ -39,6 +39,9 @@ export class User {
   @Column({ type: 'enum', enum: UserRole, default: UserRole.User })
   role: UserRole;
 
+  @Column({ default: true })
+  isActive: boolean;
+
   @Column({ nullable: true })
   organizationId: string | null;
 

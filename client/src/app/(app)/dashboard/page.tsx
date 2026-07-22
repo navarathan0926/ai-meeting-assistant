@@ -1,7 +1,8 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import { AudioUpload } from '@/components/upload/AudioUpload';
 import { MeetingResults } from '@/components/results/MeetingResults';
 import { MeetingAudioPlayer } from '@/components/results/MeetingAudioPlayer';
@@ -12,9 +13,20 @@ import { useAuthContext } from '@/providers/AuthProvider';
 import { MeetingStatus } from '@/types/meeting';
 
 export default function DashboardPage() {
+  const router = useRouter();
   const { user, logout } = useAuthContext();
   const [activeMeetingId, setActiveMeetingId] = useState<string | null>(null);
   const { data: activeMeeting } = useMeeting(activeMeetingId);
+
+  useEffect(() => {
+    if (user?.role === 'SUPERADMIN') {
+      router.replace('/superadmin');
+    }
+  }, [user, router]);
+
+  if (user?.role === 'SUPERADMIN') {
+    return null;
+  }
 
   return (
     <div className="min-h-screen bg-[#09090f] text-white flex flex-col">
@@ -24,12 +36,12 @@ export default function DashboardPage() {
           <h1 className="font-bold text-lg tracking-tight">AI Meeting Assistant</h1>
         </Link>
         <div className="ml-auto flex items-center gap-4">
-          {user?.role === 'SUPERADMIN' ? (
+          {user?.role === 'ADMIN' ? (
             <Link
-              href="/superadmin"
-              className="text-xs text-amber-200/80 hover:text-amber-100 transition-colors"
+              href="/settings/users"
+              className="text-xs text-white/60 hover:text-white transition-colors"
             >
-              Platform admin
+              Users
             </Link>
           ) : null}
           <Link

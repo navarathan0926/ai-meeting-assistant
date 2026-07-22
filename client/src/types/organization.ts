@@ -33,3 +33,29 @@ export interface CreateOrganizationAdminPayload {
   password: string;
   role: 'ADMIN';
 }
+
+export interface OrganizationUserSummary {
+  id: string;
+  email: string;
+  name: string;
+  role: 'USER' | 'ADMIN' | 'SUPERADMIN';
+  provider: 'local' | 'google';
+  isActive: boolean;
+  createdAt: string;
+}
+
+export interface OrganizationAdminSummary {
+  id: string;
+  email: string;
+  name: string;
+  role: 'ADMIN';
+  provider: 'local' | 'google';
+  isActive: boolean;
+  createdAt: string;
+}
+
+export interface CreateOrganizationUserPayload {
+  email: string;
+  name: string;
+  password: string;
+}

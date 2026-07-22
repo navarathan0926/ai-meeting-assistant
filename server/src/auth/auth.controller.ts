@@ -8,6 +8,7 @@ import {
   Res,
   HttpCode,
   HttpStatus,
+  ForbiddenException,
 } from '@nestjs/common';
 import { Request, Response } from 'express';
 import { ConfigType } from '@nestjs/config';
@@ -46,6 +47,11 @@ export class AuthController {
     return this.authService.register(registerDto);
   }
 
+  @Get('config')
+  getPublicConfig() {
+    return this.authService.getPublicConfig();
+  }
+
   @Throttle({ default: { limit: 5, ttl: 60_000 } })
   @Post('login')
   login(@Body() loginDto: LoginDto) {
@@ -67,18 +73,30 @@ export class AuthController {
   @Get('google/callback')
   @UseGuards(GoogleOauthGuard)
   async googleAuthRedirect(@Req() req: GoogleAuthRequest, @Res() res: Response) {
-    const result = await this.authService.googleLogin({
-      googleId: req.user.googleId,
-      email: req.user.email,
-      name: req.user.name,
-    });
+    try {
+      const result = await this.authService.googleLogin({
+        googleId: req.user.googleId,
+        email: req.user.email,
+        name: req.user.name,
+      });
 
-    const code = await this.authService.createOAuthRedirectCode(
-      result.accessToken,
-    );
-    return res.redirect(
-      `${this.appConfig.frontendUrl}/login?code=${code}`,
-    );
+      const code = await this.authService.createOAuthRedirectCode(
+        result.accessToken,
+      );
+      return res.redirect(
+        `${this.appConfig.frontendUrl}/login?code=${code}`,
+      );
+    } catch (error) {
+      if (error instanceof ForbiddenException) {
+        return res.redirect(
+          `${this.appConfig.frontendUrl}/login?error=registration_disabled`,
+        );
+      }
+
+      return res.redirect(
+        `${this.appConfig.frontendUrl}/login?error=google_auth_failed`,
+      );
+    }
   }
 
   @Auth()

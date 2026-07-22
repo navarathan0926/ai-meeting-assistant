@@ -11,6 +11,15 @@ interface ApiEnvelope<T> {
   timestamp: string;
 }
 
+export interface PublicAuthConfig {
+  allowPublicSignup: boolean;
+}
+
+export async function fetchAuthConfig(): Promise<PublicAuthConfig> {
+  const res = await apiClient.get<ApiEnvelope<PublicAuthConfig>>('/auth/config');
+  return res.data.data;
+}
+
 export async function registerUser(payload: RegisterPayload): Promise<AuthSession> {
   const res = await apiClient.post<ApiEnvelope<AuthSession>>(
     '/auth/register',

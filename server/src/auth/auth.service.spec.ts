@@ -4,6 +4,7 @@ import {
   ConflictException,
   UnauthorizedException,
   NotFoundException,
+  ForbiddenException,
 } from '@nestjs/common';
 import { Repository } from 'typeorm';
 import { JwtService } from '@nestjs/jwt';
@@ -11,12 +12,16 @@ import * as bcrypt from 'bcryptjs';
 import { AuthService } from './auth.service';
 import { AuthOauthCodeService } from './auth-oauth-code.service';
 import { User } from './entities/user.entity';
+import { PlatformSettingsService } from '../platform-settings/platform-settings.service';
 
 describe('AuthService', () => {
   let service: AuthService;
   let userRepo: jest.Mocked<Repository<User>>;
   let jwtService: jest.Mocked<JwtService>;
   let oauthCodeService: jest.Mocked<AuthOauthCodeService>;
+  let platformSettingsService: jest.Mocked<
+    Pick<PlatformSettingsService, 'isPublicSignupAllowed'>
+  >;
 
   beforeEach(async () => {
     const mockQueryBuilder = {
@@ -51,6 +56,12 @@ describe('AuthService', () => {
             exchangeCode: jest.fn(),
           },
         },
+        {
+          provide: PlatformSettingsService,
+          useValue: {
+            isPublicSignupAllowed: jest.fn().mockResolvedValue(true),
+          },
+        },
       ],
     }).compile();
 
@@ -58,9 +69,21 @@ describe('AuthService', () => {
     userRepo = module.get(getRepositoryToken(User));
     jwtService = module.get(JwtService);
     oauthCodeService = module.get(AuthOauthCodeService);
+    platformSettingsService = module.get(PlatformSettingsService);
   });
 
   describe('register', () => {
+    it('should throw ForbiddenException when public signup is disabled', async () => {
+      platformSettingsService.isPublicSignupAllowed.mockResolvedValue(false);
+
+      await expect(
+        service.register({
+          name: 'Test',
+          email: 'test@example.com',
+          password: 'password123',
+        }),
+      ).rejects.toThrow(ForbiddenException);
+    });
     it('should throw ConflictException if user email already exists', async () => {
       userRepo.findOne.mockResolvedValue(new User());
 
@@ -124,6 +147,7 @@ describe('AuthService', () => {
           provider: 'local',
           role: 'USER',
           organizationId: '00000000-0000-4000-8000-000000000001',
+          isActive: true,
         }),
       );
       expect(userRepo.save).toHaveBeenCalledWith(mockUser);
@@ -196,6 +220,28 @@ describe('AuthService', () => {
           password: 'wrongpassword',
         }),
       ).rejects.toThrow(UnauthorizedException);
+    });
+
+    it('should throw ForbiddenException for suspended users', async () => {
+      const passwordHash = await bcrypt.hash('correctpassword', 12);
+      const mockUser = {
+        id: 'user-uuid',
+        email: 'test@example.com',
+        name: 'Test User',
+        passwordHash,
+        provider: 'local',
+        isActive: false,
+      } as User;
+
+      const mockQb = userRepo.createQueryBuilder();
+      (mockQb.getOne as jest.Mock).mockResolvedValue(mockUser);
+
+      await expect(
+        service.login({
+          email: 'test@example.com',
+          password: 'correctpassword',
+        }),
+      ).rejects.toThrow(ForbiddenException);
     });
 
     it('should login successfully and return access token', async () => {
@@ -277,6 +323,21 @@ describe('AuthService', () => {
       expect(result.user.id).toBe('user-uuid');
     });
 
+    it('should block new Google users when public signup is disabled', async () => {
+      platformSettingsService.isPublicSignupAllowed.mockResolvedValue(false);
+      userRepo.findOne
+        .mockResolvedValueOnce(null)
+        .mockResolvedValueOnce(null);
+
+      await expect(
+        service.googleLogin({
+          googleId: 'google-999',
+          email: 'new@example.com',
+          name: 'New Google User',
+        }),
+      ).rejects.toThrow(ForbiddenException);
+    });
+
     it('should create new user if googleId and email do not exist', async () => {
       userRepo.findOne
         .mockResolvedValueOnce(null)
@@ -306,6 +367,7 @@ describe('AuthService', () => {
         passwordHash: null,
         role: 'USER',
         organizationId: '00000000-0000-4000-8000-000000000001',
+        isActive: true,
       });
       expect(userRepo.save).toHaveBeenCalledWith(mockUser);
       expect(result.user.id).toBe('new-uuid');

@@ -19,7 +19,22 @@ in the `Authorization: Bearer <token>` header.
 - On success, the strategy upserts a `User` record using `googleId` and
   returns a signed JWT.
 - The client receives the JWT via a redirect query param:
-  `FRONTEND_URL/auth/callback?token=<jwt>`.
+  `FRONTEND_URL/login?code=<oauth-code>`.
+- **New Google accounts** are only created when `platform_settings.allowPublicSignup`
+  is `true`. Existing users can always sign in with Google.
+
+### Public signup gate
+- Platform-wide toggle stored in `platform_settings.allowPublicSignup`
+  (default `false`).
+- SUPERADMIN reads/updates via `GET/PATCH /api/platform-settings`.
+- Public clients read via `GET /api/auth/config` (no auth).
+- When disabled, `POST /api/auth/register` and the Google **new-user** branch
+  return **403 Forbidden**. Register/OAuth code paths remain in the codebase.
+
+### Suspended users
+- Users have `isActive` (default `true`). Org ADMINs suspend/reactivate USER
+  accounts via `/api/organizations/users/:id/suspend|reactivate`.
+- Suspended users cannot log in via password or Google (`403 Forbidden`).
 
 ### Token Expiry
 - JWT expiry is configured via `JWT_EXPIRY` env var (recommended: `7d` for
@@ -40,7 +55,7 @@ Introduced in Phase 10. Three roles, ordered by permission level:
 |------|--------|
 | `USER` | Upload meetings, view own meetings, edit draft extracted items |
 | `ADMIN` | Everything USER can do + approve items, configure org Jira/integrations, manage org users |
-| `SUPERADMIN` | Everything ADMIN can do + manage all organizations, access Bull Board, view billing |
+| `SUPERADMIN` | Manage all organizations, platform settings, create org ADMINs; no org meeting access |
 
 ### Guards
 
@@ -69,8 +84,13 @@ Introduced in Phase 10. Three roles, ordered by permission level:
 
 - A `USER` can only access meetings they uploaded (`meeting.userId === req.user.id`). Cross-user access returns **403 Forbidden**.
 - An `ADMIN` can access all meetings and extracted items within their organization (`organizationId` match).
-- A `SUPERADMIN` can access all meetings across all organizations (Phase 11).
-- `OrganizationGuard` (Phase 11) will formalize org-level scoping; Phase 10 uses `assertMeetingAccess` in services.
+- A `SUPERADMIN` manages platform orgs and settings but cannot access organization
+  meetings via the standard meeting APIs (`assertMeetingAccess` blocks SUPERADMIN).
+- `OrganizationGuard` (Phase 11) formalizes org-level scoping on meeting and
+  extracted-item routes.
+
+See also [`access-control.md`](access-control.md) for org-admin API paths and
+the public signup decision record.
 
 ---
 

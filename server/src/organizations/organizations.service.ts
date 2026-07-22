@@ -1,6 +1,7 @@
 import {
   BadRequestException,
   ConflictException,
+  ForbiddenException,
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
@@ -16,6 +17,7 @@ import { User } from '../auth/entities/user.entity';
 import { UserRole } from '../auth/enums/user-role.enum';
 import { Meeting } from '../meetings/entities/meeting.entity';
 import { ExtractedItem } from '../extracted-items/entities/extracted-item.entity';
+import { OrganizationAdminSummary } from './interfaces/organization-admin-summary.interface';
 
 export interface OrganizationSummary {
   id: string;
@@ -93,10 +95,8 @@ export class OrganizationsService {
 
     const email = dto.email.toLowerCase();
     const existing = await this.userRepository.findOne({ where: { email } });
-    console.log('existing', existing);
 
     if (existing) {
-      console.log('existing', existing);
       throw new ConflictException('An account with this email already exists.');
     }
 
@@ -112,6 +112,7 @@ export class OrganizationsService {
       provider: 'local',
       role: UserRole.Admin,
       organizationId,
+      isActive: true,
     });
     await this.userRepository.save(user);
 
@@ -121,6 +122,67 @@ export class OrganizationsService {
       name: user.name,
       role: user.role,
     };
+  }
+
+  async listOrganizationAdmins(
+    organizationId: string,
+  ): Promise<OrganizationAdminSummary[]> {
+    await this.findOrganizationEntity(organizationId);
+
+    const admins = await this.userRepository.find({
+      where: { organizationId, role: UserRole.Admin },
+      order: { createdAt: 'ASC' },
+    });
+
+    return admins.map((admin) => this.toAdminSummary(admin));
+  }
+
+  async suspendOrganizationAdmin(
+    organizationId: string,
+    userId: string,
+  ): Promise<OrganizationAdminSummary> {
+    const admin = await this.getOrganizationAdmin(organizationId, userId);
+
+    if (admin.isActive) {
+      const activeAdminCount = await this.countActiveAdmins(organizationId);
+      if (activeAdminCount <= 1) {
+        throw new BadRequestException(
+          'Cannot suspend the last active admin for this organization.',
+        );
+      }
+    }
+
+    admin.isActive = false;
+    const saved = await this.userRepository.save(admin);
+    return this.toAdminSummary(saved);
+  }
+
+  async reactivateOrganizationAdmin(
+    organizationId: string,
+    userId: string,
+  ): Promise<OrganizationAdminSummary> {
+    const admin = await this.getOrganizationAdmin(organizationId, userId);
+    admin.isActive = true;
+    const saved = await this.userRepository.save(admin);
+    return this.toAdminSummary(saved);
+  }
+
+  async deleteOrganizationAdmin(
+    organizationId: string,
+    userId: string,
+  ): Promise<void> {
+    await this.getOrganizationAdmin(organizationId, userId);
+
+    const adminCount = await this.userRepository.count({
+      where: { organizationId, role: UserRole.Admin },
+    });
+    if (adminCount <= 1) {
+      throw new BadRequestException(
+        'Cannot delete the last admin for this organization.',
+      );
+    }
+
+    await this.userRepository.delete(userId);
   }
 
   requireOrganizationId(user: User): string {
@@ -138,6 +200,54 @@ export class OrganizationsService {
       throw new NotFoundException(`Organization with id "${id}" not found.`);
     }
     return org;
+  }
+
+  private async getOrganizationAdmin(
+    organizationId: string,
+    userId: string,
+  ): Promise<User> {
+    await this.findOrganizationEntity(organizationId);
+
+    const user = await this.userRepository.findOne({ where: { id: userId } });
+    if (!user) {
+      throw new NotFoundException(`User with id "${userId}" not found.`);
+    }
+
+    if (user.organizationId !== organizationId) {
+      throw new ForbiddenException(
+        'This admin does not belong to the organization.',
+      );
+    }
+
+    if (user.role !== UserRole.Admin) {
+      throw new BadRequestException(
+        'Only ADMIN accounts can be managed from this endpoint.',
+      );
+    }
+
+    return user;
+  }
+
+  private async countActiveAdmins(organizationId: string): Promise<number> {
+    return this.userRepository.count({
+      where: {
+        organizationId,
+        role: UserRole.Admin,
+        isActive: true,
+      },
+    });
+  }
+
+  private toAdminSummary(user: User): OrganizationAdminSummary {
+    return {
+      id: user.id,
+      email: user.email,
+      name: user.name,
+      role: UserRole.Admin,
+      provider: user.provider,
+      isActive: user.isActive,
+      createdAt: user.createdAt,
+    };
   }
 
   private async toSummary(org: Organization): Promise<OrganizationSummary> {

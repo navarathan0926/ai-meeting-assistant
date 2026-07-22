@@ -8,8 +8,10 @@ import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useLogin } from '@/hooks/useAuth';
 import { useAuthContext } from '@/providers/AuthProvider';
+import { useAuthConfig } from '@/hooks/useAuthConfig';
 import { exchangeOAuthCode } from '@/lib/api/auth';
-import { getApiErrorCode, getApiErrorMessage } from '@/lib/api/auth-errors';
+import { getApiErrorCode, getUserFacingErrorMessage } from '@/lib/api/auth-errors';
+import { getDefaultAppPath } from '@/lib/auth-routes';
 import { GOOGLE_AUTH_URL } from '@/lib/auth-urls';
 import { AUTH_ERROR_CODES } from '@/types/auth';
 
@@ -34,10 +36,13 @@ function GoogleIcon() {
 function LoginForm() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const { isAuthenticated, isLoading, login } = useAuthContext();
+  const { isAuthenticated, isLoading, login, user } = useAuthContext();
   const { mutate: loginMutate, isPending, error } = useLogin();
+  const { data: authConfig } = useAuthConfig();
   const [showPassword, setShowPassword] = useState(false);
   const [oauthError, setOauthError] = useState<string | null>(null);
+  const [registrationDisabledMessage, setRegistrationDisabledMessage] =
+    useState<string | null>(null);
   const [isExchangingCode, setIsExchangingCode] = useState(false);
   const [highlightGoogle, setHighlightGoogle] = useState(false);
 
@@ -49,6 +54,22 @@ function LoginForm() {
       return;
     }
 
+    if (errorParam === 'registration_disabled') {
+      setRegistrationDisabledMessage(
+        'Public registration is disabled. Contact your organization admin for access.',
+      );
+      window.history.replaceState(null, '', '/login');
+      return;
+    }
+
+    const messageParam = searchParams.get('message');
+    if (messageParam === 'registration_disabled') {
+      setRegistrationDisabledMessage(
+        'Public registration is disabled. Contact your organization admin for access.',
+      );
+      window.history.replaceState(null, '', '/login');
+    }
+
     const code = searchParams.get('code');
     if (!code) {
       return;
@@ -58,7 +79,7 @@ function LoginForm() {
     exchangeOAuthCode(code)
       .then((data) => {
         login(data);
-        router.replace('/dashboard');
+        router.replace(getDefaultAppPath(data.user.role));
       })
       .catch(() => {
         setOauthError('Google sign-in failed. Please try again.');
@@ -70,10 +91,10 @@ function LoginForm() {
   }, [searchParams, login, router]);
 
   useEffect(() => {
-    if (!isLoading && isAuthenticated) {
-      router.replace('/dashboard');
+    if (!isLoading && isAuthenticated && user) {
+      router.replace(getDefaultAppPath(user.role));
     }
-  }, [isAuthenticated, isLoading, router]);
+  }, [isAuthenticated, isLoading, router, user]);
 
   const {
     register,
@@ -97,8 +118,7 @@ function LoginForm() {
   };
 
   const apiError =
-    getApiErrorMessage(error) ??
-    (error ? 'Login failed. Please try again.' : null);
+    error ? getUserFacingErrorMessage(error, 'Login failed. Please try again.') : null;
 
   if (isExchangingCode) {
     return (
@@ -172,9 +192,9 @@ function LoginForm() {
           )}
         </div>
 
-        {(oauthError || apiError) && (
+        {(oauthError || registrationDisabledMessage || apiError) && (
           <div className="alert-error" role="alert">
-            {oauthError ?? apiError}
+            {oauthError ?? registrationDisabledMessage ?? apiError}
           </div>
         )}
 
@@ -192,12 +212,14 @@ function LoginForm() {
         </button>
       </form>
 
-      <p className="auth-footer">
-        Don&apos;t have an account?{' '}
-        <Link href="/register" className="auth-link">
-          Create one
-        </Link>
-      </p>
+      {authConfig?.allowPublicSignup ? (
+        <p className="auth-footer">
+          Don&apos;t have an account?{' '}
+          <Link href="/register" className="auth-link">
+            Create one
+          </Link>
+        </p>
+      ) : null}
     </div>
   );
 }

@@ -3,6 +3,7 @@
 import { useMutation } from '@tanstack/react-query';
 import { useRouter } from 'next/navigation';
 import { registerUser, loginUser } from '@/lib/api/auth';
+import { getDefaultAppPath } from '@/lib/auth-routes';
 import { RegisterPayload, LoginPayload } from '@/types/auth';
 import { useAuthContext } from '@/providers/AuthProvider';
 
@@ -14,7 +15,7 @@ export function useRegister() {
     mutationFn: (payload: RegisterPayload) => registerUser(payload),
     onSuccess: (data) => {
       login(data);
-      router.push('/dashboard');
+      router.push(getDefaultAppPath(data.user.role));
     },
   });
 }
@@ -27,7 +28,7 @@ export function useLogin() {
     mutationFn: (payload: LoginPayload) => loginUser(payload),
     onSuccess: (data) => {
       login(data);
-      router.push('/dashboard');
+      router.push(getDefaultAppPath(data.user.role));
     },
   });
 }

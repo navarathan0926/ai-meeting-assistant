@@ -17,6 +17,14 @@ export default function SettingsPage() {
           <h1 className="font-bold text-lg tracking-tight">AI Meeting Assistant</h1>
         </Link>
         <div className="ml-auto flex items-center gap-4">
+          {isAdmin ? (
+            <Link
+              href="/settings/users"
+              className="text-xs text-white/60 hover:text-white transition-colors"
+            >
+              Users
+            </Link>
+          ) : null}
           <Link
             href="/dashboard"
             className="text-xs text-white/60 hover:text-white transition-colors"

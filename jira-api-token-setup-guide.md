@@ -15,6 +15,9 @@ account to the app.
 
 1. While logged into your Jira account, open this URL in your browser
    `https://yourcompany.atlassian.net/_edge/tenant_info`
+   Replace `yourcompany` with your actual site name from your Jira URL.
+   Example: if your Jira is https://myteam.atlassian.net, open
+   https://myteam.atlassian.net/_edge/tenant_info
 2. Copy the `cloudId` value from the response. You will need this later.
 
 ## Step 3: Create the API token
@@ -32,6 +35,7 @@ account to the app.
 6. Once Jira is selected, choose the following scopes.
    - `read:jira-work`
    - `write:jira-work`
+   - `read:jira-user`
 7. Click Create.
 8. Copy the token immediately and store it somewhere safe. Atlassian will
    not show you the value again.
@@ -56,13 +60,13 @@ working correctly.
 Once the steps above are complete, collect the following five values.
 These are what the app needs to connect to your Jira account.
 
-| Value | Where to find it |
-|---|---|
-| Jira site URL | Step 1 |
+| Value              | Where to find it                                  |
+| ------------------ | ------------------------------------------------- |
+| Jira site URL      | Step 1                                            |
 | Jira account email | The email of the account used to create the token |
-| API token | Step 3 |
-| Cloud ID | Step 2 |
-| Project key | Step 1 |
+| API token          | Step 3                                            |
+| Cloud ID           | Step 2                                            |
+| Project key        | Step 1                                            |
 
 ## Common issues
 

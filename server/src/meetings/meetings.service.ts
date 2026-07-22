@@ -125,6 +125,8 @@ export class MeetingsService {
       qb.where('meeting.organizationId = :organizationId', {
         organizationId: user.organizationId,
       });
+    } else if (user.role === UserRole.SuperAdmin) {
+      return { items: [], total: 0 };
     } else {
       qb.where('meeting.userId = :userId', { userId: user.id });
     }

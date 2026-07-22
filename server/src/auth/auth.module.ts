@@ -15,10 +15,12 @@ import { GoogleOauthGuard } from './guards/google-oauth.guard';
 import { AuthGuard } from '../common/guards/auth.guard';
 import { RolesGuard } from '../common/guards/roles.guard';
 import { authConfiguration } from '../common/config/auth.config';
+import { PlatformSettingsModule } from '../platform-settings/platform-settings.module';
 
 @Module({
   imports: [
     TypeOrmModule.forFeature([User]),
+    PlatformSettingsModule,
     PassportModule.register({ defaultStrategy: 'jwt' }),
     JwtModule.registerAsync({
       imports: [ConfigModule],

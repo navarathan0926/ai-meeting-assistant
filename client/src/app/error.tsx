@@ -12,7 +12,7 @@ export default function GlobalError({
       <div className="max-w-md text-center">
         <h1 className="text-xl font-semibold mb-2">Something went wrong</h1>
         <p className="text-white/60 text-sm mb-6">
-          {error.message || 'An unexpected error occurred.'}
+          An unexpected error occurred. Please try again.
         </p>
         <button
           type="button"

@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import { getUserFacingErrorMessage } from '@/lib/api/auth-errors';
 import {
   useJiraProjects,
   useUpdateProjectContext,
@@ -34,7 +35,7 @@ export function ProjectContextSettings() {
   if (isError) {
     return (
       <div className="rounded-lg border border-red-500/30 bg-red-900/20 px-3 py-2 text-sm text-red-200">
-        {error.message || 'Failed to load Jira projects.'}
+        {getUserFacingErrorMessage(error, 'Could not load Jira projects. Please try again.')}
         <button
           type="button"
           onClick={() => void refetch()}
