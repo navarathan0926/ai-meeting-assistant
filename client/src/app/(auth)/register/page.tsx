@@ -11,7 +11,8 @@ import { useAuthContext } from '@/providers/AuthProvider';
 import { fetchAuthConfig } from '@/lib/api/auth';
 import { getApiErrorCode, getUserFacingErrorMessage } from '@/lib/api/auth-errors';
 import { GOOGLE_AUTH_URL } from '@/lib/auth-urls';
-import { AUTH_ERROR_CODES } from '@/types/auth';
+import { getDefaultAppPath } from '@/lib/auth-routes';
+import { AUTH_ERROR_CODES, AuthLoginRedirectError } from '@/types/auth';
 
 // ─── Schema ───────────────────────────────────────────────────────────────────
 
@@ -70,7 +71,7 @@ function GoogleIcon() {
 
 export default function RegisterPage() {
   const router = useRouter();
-  const { isAuthenticated, isLoading } = useAuthContext();
+  const { isAuthenticated, isLoading, user } = useAuthContext();
   const { mutate: registerMutate, isPending, error } = useRegister();
   const [isConfigLoading, setIsConfigLoading] = useState(true);
   const [signupAllowed, setSignupAllowed] = useState(true);
@@ -79,10 +80,10 @@ export default function RegisterPage() {
   const [highlightGoogle, setHighlightGoogle] = useState(false);
 
   useEffect(() => {
-    if (!isLoading && isAuthenticated) {
-      router.replace('/dashboard');
+    if (!isLoading && isAuthenticated && user) {
+      router.replace(getDefaultAppPath(user.role));
     }
-  }, [isAuthenticated, isLoading, router]);
+  }, [isAuthenticated, isLoading, router, user]);
 
   useEffect(() => {
     let cancelled = false;
@@ -94,13 +95,17 @@ export default function RegisterPage() {
         }
         setSignupAllowed(config.allowPublicSignup);
         if (!config.allowPublicSignup) {
-          router.replace('/login?message=registration_disabled');
+          router.replace(
+            `/login?message=${AuthLoginRedirectError.REGISTRATION_DISABLED}`,
+          );
         }
       })
       .catch(() => {
         if (!cancelled) {
           setSignupAllowed(false);
-          router.replace('/login?message=registration_disabled');
+          router.replace(
+            `/login?message=${AuthLoginRedirectError.REGISTRATION_DISABLED}`,
+          );
         }
       })
       .finally(() => {

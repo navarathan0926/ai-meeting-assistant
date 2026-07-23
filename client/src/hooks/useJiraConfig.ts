@@ -6,6 +6,7 @@ import { getUserFacingErrorMessage } from '@/lib/api/auth-errors';
 import { JiraConfig, UpdateJiraConfigPayload } from '@/types/organization';
 import { useToast } from '@/providers/ToastProvider';
 import { useAuthContext } from '@/providers/AuthProvider';
+import { UserRole } from '@/types/auth';
 
 export const jiraConfigKeys = {
   all: (userId: string) => ['jira-config', userId] as const,
@@ -18,7 +19,7 @@ export function useJiraConfig() {
   return useQuery<JiraConfig, Error>({
     queryKey: jiraConfigKeys.all(userId),
     queryFn: () => organizationsApi.getJiraConfig(),
-    enabled: !!userId && user?.role === 'ADMIN',
+    enabled: !!userId && user?.role === UserRole.Admin,
   });
 }
 

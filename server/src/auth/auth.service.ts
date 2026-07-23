@@ -11,7 +11,10 @@ import { JwtService } from '@nestjs/jwt';
 import * as bcrypt from 'bcryptjs';
 import { User } from './entities/user.entity';
 import { UserRole } from './enums/user-role.enum';
+import { AuthErrorCode } from './enums/auth-error-code.enum';
 import { DEFAULT_ORGANIZATION_ID } from '../organizations/organizations.constants';
+import { Organization } from '../organizations/entities/organization.entity';
+import { OrganizationStatus } from '../organizations/enums/organization-status.enum';
 import { RegisterDto } from './dto/register.dto';
 import { LoginDto } from './dto/login.dto';
 import { AuthOauthCodeService } from './auth-oauth-code.service';
@@ -39,6 +42,8 @@ export class AuthService {
   constructor(
     @InjectRepository(User)
     private readonly userRepository: Repository<User>,
+    @InjectRepository(Organization)
+    private readonly organizationRepository: Repository<Organization>,
     private readonly jwtService: JwtService,
     private readonly oauthCodeService: AuthOauthCodeService,
     private readonly platformSettingsService: PlatformSettingsService,
@@ -64,7 +69,7 @@ export class AuthService {
         throw new ConflictException({
           message:
             'An account with this email already exists. Sign in with Google instead.',
-          code: 'GOOGLE_ACCOUNT_EXISTS',
+          code: AuthErrorCode.GOOGLE_ACCOUNT_EXISTS,
         });
       }
       throw new ConflictException('An account with this email already exists.');
@@ -98,14 +103,14 @@ export class AuthService {
       throw new UnauthorizedException('Invalid email or password.');
     }
 
-    this.assertUserIsActive(user);
+    await this.assertAccountCanAuthenticate(user);
 
     if (!user.passwordHash) {
       if (user.googleId) {
         throw new UnauthorizedException({
           message:
             'This account uses Google Sign-In. Please continue with Google.',
-          code: 'GOOGLE_AUTH_REQUIRED',
+          code: AuthErrorCode.GOOGLE_AUTH_REQUIRED,
         });
       }
       throw new UnauthorizedException('Invalid email or password.');
@@ -136,7 +141,7 @@ export class AuthService {
       });
 
       if (user) {
-        this.assertUserIsActive(user);
+        await this.assertAccountCanAuthenticate(user);
         user.googleId = profile.googleId;
         await this.userRepository.save(user);
       } else {
@@ -155,7 +160,7 @@ export class AuthService {
         await this.userRepository.save(user);
       }
     } else {
-      this.assertUserIsActive(user);
+      await this.assertAccountCanAuthenticate(user);
     }
 
     return this.buildAuthResult(user);
@@ -172,7 +177,7 @@ export class AuthService {
     if (!accessToken) {
       throw new UnauthorizedException({
         message: 'Invalid or expired authorization code.',
-        code: 'OAUTH_CODE_INVALID',
+        code: AuthErrorCode.OAUTH_CODE_INVALID,
       });
     }
 
@@ -182,12 +187,11 @@ export class AuthService {
     } catch {
       throw new UnauthorizedException({
         message: 'Invalid or expired authorization code.',
-        code: 'OAUTH_CODE_INVALID',
+        code: AuthErrorCode.OAUTH_CODE_INVALID,
       });
     }
 
     const user = await this.validateById(payload.sub);
-    this.assertUserIsActive(user);
     return this.buildAuthResult(user);
   }
 
@@ -196,6 +200,7 @@ export class AuthService {
   async validateById(userId: string): Promise<User> {
     const user = await this.userRepository.findOne({ where: { id: userId } });
     if (!user) throw new NotFoundException('User not found.');
+    await this.assertAccountCanAuthenticate(user);
     return user;
   }
 
@@ -204,15 +209,52 @@ export class AuthService {
   private async assertPublicSignupAllowed(): Promise<void> {
     const allowed = await this.platformSettingsService.isPublicSignupAllowed();
     if (!allowed) {
-      throw new ForbiddenException('Public registration is disabled.');
+      throw new ForbiddenException({
+        message: 'Public registration is disabled.',
+        code: AuthErrorCode.REGISTRATION_DISABLED,
+      });
+    }
+  }
+
+  private async assertAccountCanAuthenticate(user: User): Promise<void> {
+    this.assertUserIsActive(user);
+
+    if (user.role === UserRole.SuperAdmin) {
+      return;
+    }
+
+    if (!user.organizationId) {
+      throw new ForbiddenException({
+        message:
+          'Your account is not assigned to an organization. Contact platform support.',
+        code: AuthErrorCode.ORGANIZATION_REQUIRED,
+      });
+    }
+
+    const org = await this.organizationRepository.findOne({
+      where: { id: user.organizationId },
+    });
+
+    if (
+      !org ||
+      !org.isActive ||
+      org.status === OrganizationStatus.Suspended
+    ) {
+      throw new ForbiddenException({
+        message:
+          'Your organization has been suspended. Contact platform support.',
+        code: AuthErrorCode.ORGANIZATION_SUSPENDED,
+      });
     }
   }
 
   private assertUserIsActive(user: User): void {
     if (user.isActive === false) {
-      throw new ForbiddenException(
-        'This account has been suspended. Contact your organization admin.',
-      );
+      throw new ForbiddenException({
+        message:
+          'This account has been suspended. Contact your organization admin.',
+        code: AuthErrorCode.USER_SUSPENDED,
+      });
     }
   }
 

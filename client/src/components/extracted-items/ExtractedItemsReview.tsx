@@ -19,6 +19,7 @@ import {
 } from '@/hooks/useExtractedItems';
 import { useJiraProjects } from '@/hooks/useJiraProjects';
 import { useAuthContext } from '@/providers/AuthProvider';
+import { UserRole } from '@/types/auth';
 import { ConfirmationModal } from '@/components/common/ConfirmationModal';
 import { ProjectSelector } from '@/components/extracted-items/ProjectSelector';
 import { JiraDocumentRenderer } from '@/lib/jira-document/JiraDocumentRenderer';
@@ -51,7 +52,7 @@ export function ExtractedItemsReview({
   extractionAnalysis,
 }: ExtractedItemsReviewProps) {
   const { user } = useAuthContext();
-  const canApprove = user?.role === 'ADMIN';
+  const canApprove = user?.role === UserRole.Admin;
   const { data: items, isLoading, isFetching } = useExtractedItems(meetingId);
   const { data: projects = [] } = useJiraProjects();
 

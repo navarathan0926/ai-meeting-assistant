@@ -1,9 +1,6 @@
 'use client';
 
-import Link from 'next/link';
-import { useEffect, useState } from 'react';
-import { useRouter } from 'next/navigation';
-import { useAuthContext } from '@/providers/AuthProvider';
+import { useState } from 'react';
 import {
   useCreateOrganization,
   useCreateOrganizationAdmin,
@@ -13,12 +10,10 @@ import {
 } from '@/hooks/useOrganizations';
 import { OrganizationAdminsPanel } from '@/components/superadmin/OrganizationAdminsPanel';
 import { getUserFacingErrorMessage } from '@/lib/api/auth-errors';
-import { getDefaultAppPath } from '@/lib/auth-routes';
 import { OrganizationSummary } from '@/types/organization';
+import { UserRole } from '@/types/auth';
 
 export default function SuperAdminPage() {
-  const router = useRouter();
-  const { user, logout } = useAuthContext();
   const { data: organizations, isLoading, isError, error } = useOrganizations();
   const createOrg = useCreateOrganization();
   const suspendOrg = useSuspendOrganization();
@@ -31,16 +26,6 @@ export default function SuperAdminPage() {
   const [adminEmail, setAdminEmail] = useState('');
   const [adminName, setAdminName] = useState('');
   const [adminPassword, setAdminPassword] = useState('');
-
-  useEffect(() => {
-    if (user && user.role !== 'SUPERADMIN') {
-      router.replace(getDefaultAppPath(user.role));
-    }
-  }, [user, router]);
-
-  if (!user || user.role !== 'SUPERADMIN') {
-    return null;
-  }
 
   const busy =
     createOrg.isPending ||
@@ -64,7 +49,7 @@ export default function SuperAdminPage() {
           email: adminEmail.trim(),
           name: adminName.trim(),
           password: adminPassword,
-          role: 'ADMIN',
+          role: UserRole.Admin,
         },
       },
       {
@@ -80,36 +65,8 @@ export default function SuperAdminPage() {
   };
 
   return (
-    <div className="min-h-screen bg-[#09090f] text-white flex flex-col">
-      <header className="sticky top-0 z-40 border-b border-white/8 px-6 py-4 flex items-center gap-3 bg-[#09090f]/95 backdrop-blur">
-        <Link href="/superadmin" className="flex items-center gap-3 hover:opacity-90">
-          <span className="text-2xl">🎙️</span>
-          <h1 className="font-bold text-lg tracking-tight">Platform Admin</h1>
-        </Link>
-        <div className="ml-auto flex items-center gap-4">
-          <Link
-            href="/superadmin/platform-settings"
-            className="text-xs text-white/60 hover:text-white transition-colors"
-          >
-            Platform settings
-          </Link>
-          <span className="text-xs text-white/50 font-mono hidden sm:inline">
-            {user.name}
-            <span className="ml-2 rounded px-1.5 py-0.5 text-[10px] uppercase tracking-wide bg-amber-500/20 text-amber-200">
-              SUPERADMIN
-            </span>
-          </span>
-          <button
-            onClick={() => void logout()}
-            className="text-xs bg-white/5 hover:bg-white/10 text-white/80 hover:text-white px-3 py-1.5 rounded border border-white/10 transition-colors"
-          >
-            Sign out
-          </button>
-        </div>
-      </header>
-
-      <main className="flex-1 overflow-y-auto p-6 md:p-10">
-        <div className="max-w-5xl mx-auto flex flex-col gap-6">
+    <main className="flex-1 overflow-y-auto p-6 md:p-10">
+      <div className="max-w-5xl mx-auto flex flex-col gap-6">
           <div>
             <h2 className="text-xl font-semibold text-white/90">Organizations</h2>
             <p className="mt-1 text-sm text-white/45">
@@ -210,7 +167,6 @@ export default function SuperAdminPage() {
           </section>
         </div>
       </main>
-    </div>
   );
 }
 
@@ -255,7 +211,15 @@ function OrganizationRow({
       <tr className="border-b border-white/5 align-top">
         <td className="py-3 pr-4">
           <div className="font-medium text-white/90">{org.name}</div>
-          <div className="text-xs text-white/35 font-mono mt-1">{org.id}</div>
+          {org.firstAdmin ? (
+            <div className="text-xs text-white/45 mt-1">
+              {org.firstAdmin.name}
+              <span className="mx-1 text-white/25">·</span>
+              <span className="font-mono">{org.firstAdmin.email}</span>
+            </div>
+          ) : (
+            <div className="text-xs text-white/35 mt-1">No admin yet</div>
+          )}
         </td>
         <td className="py-3 pr-4">
           <span

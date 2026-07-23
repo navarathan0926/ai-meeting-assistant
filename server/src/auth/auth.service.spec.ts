@@ -12,11 +12,16 @@ import * as bcrypt from 'bcryptjs';
 import { AuthService } from './auth.service';
 import { AuthOauthCodeService } from './auth-oauth-code.service';
 import { User } from './entities/user.entity';
+import { Organization } from '../organizations/entities/organization.entity';
+import { OrganizationStatus } from '../organizations/enums/organization-status.enum';
+import { UserRole } from './enums/user-role.enum';
+import { AuthErrorCode } from './enums/auth-error-code.enum';
 import { PlatformSettingsService } from '../platform-settings/platform-settings.service';
 
 describe('AuthService', () => {
   let service: AuthService;
   let userRepo: jest.Mocked<Repository<User>>;
+  let organizationRepo: jest.Mocked<Repository<Organization>>;
   let jwtService: jest.Mocked<JwtService>;
   let oauthCodeService: jest.Mocked<AuthOauthCodeService>;
   let platformSettingsService: jest.Mocked<
@@ -40,6 +45,12 @@ describe('AuthService', () => {
             create: jest.fn(),
             save: jest.fn(),
             createQueryBuilder: jest.fn().mockReturnValue(mockQueryBuilder),
+          },
+        },
+        {
+          provide: getRepositoryToken(Organization),
+          useValue: {
+            findOne: jest.fn(),
           },
         },
         {
@@ -67,6 +78,7 @@ describe('AuthService', () => {
 
     service = module.get<AuthService>(AuthService);
     userRepo = module.get(getRepositoryToken(User));
+    organizationRepo = module.get(getRepositoryToken(Organization));
     jwtService = module.get(JwtService);
     oauthCodeService = module.get(AuthOauthCodeService);
     platformSettingsService = module.get(PlatformSettingsService);
@@ -112,7 +124,7 @@ describe('AuthService', () => {
         }),
       ).rejects.toMatchObject({
         response: {
-          code: 'GOOGLE_ACCOUNT_EXISTS',
+          code: AuthErrorCode.GOOGLE_ACCOUNT_EXISTS,
         },
       });
     });
@@ -124,7 +136,7 @@ describe('AuthService', () => {
         name: 'Test User',
         email: 'test@example.com',
         provider: 'local',
-        role: 'USER',
+        role: UserRole.User,
       } as User;
 
       userRepo.create.mockReturnValue(mockUser);
@@ -145,7 +157,7 @@ describe('AuthService', () => {
           name: 'Test User',
           email: 'test@example.com',
           provider: 'local',
-          role: 'USER',
+          role: UserRole.User,
           organizationId: '00000000-0000-4000-8000-000000000001',
           isActive: true,
         }),
@@ -158,7 +170,7 @@ describe('AuthService', () => {
           email: 'test@example.com',
           name: 'Test User',
           provider: 'local',
-          role: 'USER',
+          role: UserRole.User,
         },
       });
     });
@@ -185,10 +197,18 @@ describe('AuthService', () => {
         passwordHash: null,
         googleId: 'google-123',
         provider: 'google',
+        role: UserRole.User,
+        organizationId: 'org-1',
+        isActive: true,
       } as User;
 
       const mockQb = userRepo.createQueryBuilder();
       (mockQb.getOne as jest.Mock).mockResolvedValue(mockUser);
+      organizationRepo.findOne.mockResolvedValue({
+        id: 'org-1',
+        isActive: true,
+        status: OrganizationStatus.Active,
+      } as Organization);
 
       await expect(
         service.login({
@@ -197,7 +217,7 @@ describe('AuthService', () => {
         }),
       ).rejects.toMatchObject({
         response: {
-          code: 'GOOGLE_AUTH_REQUIRED',
+          code: AuthErrorCode.GOOGLE_AUTH_REQUIRED,
         },
       });
     });
@@ -209,10 +229,18 @@ describe('AuthService', () => {
         email: 'test@example.com',
         name: 'Test User',
         passwordHash,
+        role: UserRole.User,
+        organizationId: 'org-1',
+        isActive: true,
       } as User;
 
       const mockQb = userRepo.createQueryBuilder();
       (mockQb.getOne as jest.Mock).mockResolvedValue(mockUser);
+      organizationRepo.findOne.mockResolvedValue({
+        id: 'org-1',
+        isActive: true,
+        status: OrganizationStatus.Active,
+      } as Organization);
 
       await expect(
         service.login({
@@ -222,7 +250,7 @@ describe('AuthService', () => {
       ).rejects.toThrow(UnauthorizedException);
     });
 
-    it('should throw ForbiddenException for suspended users', async () => {
+    it('should throw USER_SUSPENDED for suspended users', async () => {
       const passwordHash = await bcrypt.hash('correctpassword', 12);
       const mockUser = {
         id: 'user-uuid',
@@ -241,7 +269,44 @@ describe('AuthService', () => {
           email: 'test@example.com',
           password: 'correctpassword',
         }),
-      ).rejects.toThrow(ForbiddenException);
+      ).rejects.toMatchObject({
+        response: {
+          code: AuthErrorCode.USER_SUSPENDED,
+        },
+      });
+    });
+
+    it('should throw ORGANIZATION_SUSPENDED when org is suspended', async () => {
+      const passwordHash = await bcrypt.hash('correctpassword', 12);
+      const mockUser = {
+        id: 'user-uuid',
+        email: 'test@example.com',
+        name: 'Test User',
+        passwordHash,
+        provider: 'local',
+        role: UserRole.User,
+        organizationId: 'org-1',
+        isActive: true,
+      } as User;
+
+      const mockQb = userRepo.createQueryBuilder();
+      (mockQb.getOne as jest.Mock).mockResolvedValue(mockUser);
+      organizationRepo.findOne.mockResolvedValue({
+        id: 'org-1',
+        isActive: false,
+        status: OrganizationStatus.Suspended,
+      } as Organization);
+
+      await expect(
+        service.login({
+          email: 'test@example.com',
+          password: 'correctpassword',
+        }),
+      ).rejects.toMatchObject({
+        response: {
+          code: AuthErrorCode.ORGANIZATION_SUSPENDED,
+        },
+      });
     });
 
     it('should login successfully and return access token', async () => {
@@ -252,10 +317,18 @@ describe('AuthService', () => {
         name: 'Test User',
         passwordHash,
         provider: 'local',
+        role: UserRole.User,
+        organizationId: 'org-1',
+        isActive: true,
       } as User;
 
       const mockQb = userRepo.createQueryBuilder();
       (mockQb.getOne as jest.Mock).mockResolvedValue(mockUser);
+      organizationRepo.findOne.mockResolvedValue({
+        id: 'org-1',
+        isActive: true,
+        status: OrganizationStatus.Active,
+      } as Organization);
       jwtService.sign.mockReturnValue('mock-jwt-token');
 
       const result = await service.login({
@@ -270,6 +343,7 @@ describe('AuthService', () => {
           email: 'test@example.com',
           name: 'Test User',
           provider: 'local',
+          role: UserRole.User,
         },
       });
     });
@@ -283,9 +357,17 @@ describe('AuthService', () => {
         name: 'Test User',
         googleId: 'google-123',
         provider: 'google',
+        role: UserRole.User,
+        organizationId: 'org-1',
+        isActive: true,
       } as User;
 
       userRepo.findOne.mockResolvedValueOnce(mockUser);
+      organizationRepo.findOne.mockResolvedValue({
+        id: 'org-1',
+        isActive: true,
+        status: OrganizationStatus.Active,
+      } as Organization);
 
       const result = await service.googleLogin({
         googleId: 'google-123',
@@ -305,11 +387,19 @@ describe('AuthService', () => {
         email: 'test@example.com',
         name: 'Test User',
         provider: 'local',
+        role: UserRole.User,
+        organizationId: 'org-1',
+        isActive: true,
       } as User;
 
       userRepo.findOne
         .mockResolvedValueOnce(null)
         .mockResolvedValueOnce(mockUser);
+      organizationRepo.findOne.mockResolvedValue({
+        id: 'org-1',
+        isActive: true,
+        status: OrganizationStatus.Active,
+      } as Organization);
 
       const result = await service.googleLogin({
         googleId: 'google-123',
@@ -365,7 +455,7 @@ describe('AuthService', () => {
         googleId: 'google-999',
         provider: 'google',
         passwordHash: null,
-        role: 'USER',
+        role: UserRole.User,
         organizationId: '00000000-0000-4000-8000-000000000001',
         isActive: true,
       });
@@ -389,7 +479,7 @@ describe('AuthService', () => {
 
       await expect(service.exchangeOAuthCode('bad-code')).rejects.toMatchObject({
         response: {
-          code: 'OAUTH_CODE_INVALID',
+          code: AuthErrorCode.OAUTH_CODE_INVALID,
         },
       });
     });
@@ -405,7 +495,15 @@ describe('AuthService', () => {
         email: 'test@example.com',
         name: 'Test User',
         provider: 'google',
+        role: UserRole.User,
+        organizationId: 'org-1',
+        isActive: true,
       } as User);
+      organizationRepo.findOne.mockResolvedValue({
+        id: 'org-1',
+        isActive: true,
+        status: OrganizationStatus.Active,
+      } as Organization);
       jwtService.sign.mockReturnValue('fresh-jwt-token');
 
       const result = await service.exchangeOAuthCode('valid-code');
@@ -417,6 +515,7 @@ describe('AuthService', () => {
           email: 'test@example.com',
           name: 'Test User',
           provider: 'google',
+          role: UserRole.User,
         },
       });
     });
@@ -432,11 +531,99 @@ describe('AuthService', () => {
     });
 
     it('should return user if found', async () => {
-      const mockUser = { id: 'user-uuid', email: 'test@example.com' } as User;
+      const mockUser = {
+        id: 'user-uuid',
+        email: 'test@example.com',
+        role: UserRole.User,
+        organizationId: 'org-1',
+        isActive: true,
+      } as User;
       userRepo.findOne.mockResolvedValue(mockUser);
+      organizationRepo.findOne.mockResolvedValue({
+        id: 'org-1',
+        isActive: true,
+        status: OrganizationStatus.Active,
+      } as Organization);
 
       const result = await service.validateById('user-uuid');
       expect(result).toBe(mockUser);
+    });
+
+    it('should throw ORGANIZATION_SUSPENDED when org is suspended', async () => {
+      const mockUser = {
+        id: 'user-uuid',
+        email: 'test@example.com',
+        role: UserRole.User,
+        organizationId: 'org-1',
+        isActive: true,
+      } as User;
+
+      userRepo.findOne.mockResolvedValue(mockUser);
+      organizationRepo.findOne.mockResolvedValue({
+        id: 'org-1',
+        isActive: false,
+        status: OrganizationStatus.Suspended,
+      } as Organization);
+
+      await expect(service.validateById('user-uuid')).rejects.toMatchObject({
+        response: {
+          code: AuthErrorCode.ORGANIZATION_SUSPENDED,
+        },
+      });
+    });
+
+    it('should throw USER_SUSPENDED when user is suspended', async () => {
+      const mockUser = {
+        id: 'user-uuid',
+        email: 'test@example.com',
+        role: UserRole.User,
+        organizationId: 'org-1',
+        isActive: false,
+      } as User;
+
+      userRepo.findOne.mockResolvedValue(mockUser);
+
+      await expect(service.validateById('user-uuid')).rejects.toMatchObject({
+        response: {
+          code: AuthErrorCode.USER_SUSPENDED,
+        },
+      });
+      expect(organizationRepo.findOne).not.toHaveBeenCalled();
+    });
+
+    it('should throw ORGANIZATION_REQUIRED when non-superadmin has no organization', async () => {
+      const mockUser = {
+        id: 'user-uuid',
+        email: 'test@example.com',
+        role: UserRole.User,
+        organizationId: null,
+        isActive: true,
+      } as User;
+
+      userRepo.findOne.mockResolvedValue(mockUser);
+
+      await expect(service.validateById('user-uuid')).rejects.toMatchObject({
+        response: {
+          code: AuthErrorCode.ORGANIZATION_REQUIRED,
+        },
+      });
+      expect(organizationRepo.findOne).not.toHaveBeenCalled();
+    });
+
+    it('should allow SUPERADMIN without organization', async () => {
+      const mockUser = {
+        id: 'admin-uuid',
+        email: 'admin@example.com',
+        role: UserRole.SuperAdmin,
+        organizationId: null,
+        isActive: true,
+      } as User;
+
+      userRepo.findOne.mockResolvedValue(mockUser);
+
+      const result = await service.validateById('admin-uuid');
+      expect(result).toBe(mockUser);
+      expect(organizationRepo.findOne).not.toHaveBeenCalled();
     });
   });
 });

@@ -18,8 +18,16 @@ Each feature folder under `server/src/` should include:
 - `dto/` — request validation classes
 - `entities/` — TypeORM entities (when persisted)
 - `interfaces/` — response/API shapes (optional, when not covered by DTOs)
+- `enums/` — string enums for repeated domain literals (roles, statuses, error codes)
 
 Infrastructure modules (`database/`, `storage/`, `common/`) follow the same naming pattern but may omit controllers or entities.
+
+## Enums and constants
+
+- If a string/number literal is used in **two or more** places (or is part of the public API), define a **string enum** under `enums/` and import it.
+- Use enums in entities, DTOs (`@IsEnum(...)`), services, guards, and tests — never compare against raw `'USER'` / `'ADMIN'` strings.
+- One-off UI copy or log messages do not need enums; domain state and protocol values do.
+- Keep client enums in sync when the value is returned to or accepted from the API.
 
 ## Controller rules
 
@@ -46,3 +54,9 @@ Place guards, pipes, filters, interceptors, middleware, and decorators in `serve
 
 - One primary responsibility per service.
 - Split when handling unrelated domains (e.g. `MeetingsService` vs `BlobStorageService` in `storage/`).
+
+## Security (server)
+
+- Authorize from JWT/user context; scope org data by `organizationId` from the authenticated user.
+- Use `UserRole` (and other domain enums) in guards and services — never raw role/status strings.
+- Never return password hashes, refresh secrets, or third-party tokens in API responses.

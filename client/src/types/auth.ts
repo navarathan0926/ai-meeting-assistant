@@ -1,6 +1,32 @@
 export const ACCESS_TOKEN_KEY = 'access_token';
 
-export type UserRole = 'USER' | 'ADMIN' | 'SUPERADMIN';
+export enum UserRole {
+  User = 'USER',
+  Admin = 'ADMIN',
+  SuperAdmin = 'SUPERADMIN',
+}
+
+export enum AuthErrorCode {
+  GOOGLE_AUTH_REQUIRED = 'GOOGLE_AUTH_REQUIRED',
+  GOOGLE_ACCOUNT_EXISTS = 'GOOGLE_ACCOUNT_EXISTS',
+  ORGANIZATION_SUSPENDED = 'ORGANIZATION_SUSPENDED',
+  ORGANIZATION_REQUIRED = 'ORGANIZATION_REQUIRED',
+  USER_SUSPENDED = 'USER_SUSPENDED',
+  REGISTRATION_DISABLED = 'REGISTRATION_DISABLED',
+  OAUTH_CODE_INVALID = 'OAUTH_CODE_INVALID',
+}
+
+/** @deprecated Prefer AuthErrorCode */
+export const AUTH_ERROR_CODES = AuthErrorCode;
+
+/** Query `error=` / `message=` values on the login page. */
+export enum AuthLoginRedirectError {
+  GOOGLE_AUTH_FAILED = 'google_auth_failed',
+  REGISTRATION_DISABLED = 'registration_disabled',
+  ORGANIZATION_SUSPENDED = 'organization_suspended',
+  ORGANIZATION_REQUIRED = 'organization_required',
+  USER_SUSPENDED = 'user_suspended',
+}
 
 export interface AuthUser {
   id: string;
@@ -32,8 +58,3 @@ export interface ApiErrorResponse {
   code?: string;
   error?: string;
 }
-
-export const AUTH_ERROR_CODES = {
-  GOOGLE_AUTH_REQUIRED: 'GOOGLE_AUTH_REQUIRED',
-  GOOGLE_ACCOUNT_EXISTS: 'GOOGLE_ACCOUNT_EXISTS',
-} as const;

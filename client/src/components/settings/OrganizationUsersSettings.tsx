@@ -11,6 +11,7 @@ import {
 import { ConfirmationModal } from '@/components/common/ConfirmationModal';
 import { getUserFacingErrorMessage } from '@/lib/api/auth-errors';
 import { OrganizationUserSummary } from '@/types/organization';
+import { UserRole } from '@/types/auth';
 
 export function OrganizationUsersSettings() {
   const { data: users = [], isLoading, isError, error } = useOrganizationUsers();
@@ -142,7 +143,7 @@ export function OrganizationUsersSettings() {
                   )}
                 </td>
                 <td className="py-3">
-                  {user.role === 'USER' ? (
+                  {user.role === UserRole.User ? (
                     <div className="flex flex-wrap gap-2">
                       {user.isActive ? (
                         <button

@@ -87,6 +87,7 @@ export function useCreateOrganizationAdmin() {
       void queryClient.invalidateQueries({
         queryKey: organizationKeys.admins(organizationId),
       });
+      void queryClient.invalidateQueries({ queryKey: organizationKeys.all });
       showToast(`Admin ${admin.email} created.`, 'success');
     },
     onError: (err) => {
@@ -113,6 +114,7 @@ export function useSuspendOrganizationAdmin(organizationId: string) {
       void queryClient.invalidateQueries({
         queryKey: organizationKeys.admins(organizationId),
       });
+      void queryClient.invalidateQueries({ queryKey: organizationKeys.all });
       showToast('Admin suspended.', 'success');
     },
     onError: (err) => {
@@ -132,6 +134,7 @@ export function useReactivateOrganizationAdmin(organizationId: string) {
       void queryClient.invalidateQueries({
         queryKey: organizationKeys.admins(organizationId),
       });
+      void queryClient.invalidateQueries({ queryKey: organizationKeys.all });
       showToast('Admin reactivated.', 'success');
     },
     onError: (err) => {
@@ -150,6 +153,7 @@ export function useDeleteOrganizationAdmin(organizationId: string) {
       void queryClient.invalidateQueries({
         queryKey: organizationKeys.admins(organizationId),
       });
+      void queryClient.invalidateQueries({ queryKey: organizationKeys.all });
       showToast('Admin deleted.', 'success');
     },
     onError: (err) => {

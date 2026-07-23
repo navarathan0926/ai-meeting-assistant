@@ -18,16 +18,10 @@ import { UserRole } from '../auth/enums/user-role.enum';
 import { Meeting } from '../meetings/entities/meeting.entity';
 import { ExtractedItem } from '../extracted-items/entities/extracted-item.entity';
 import { OrganizationAdminSummary } from './interfaces/organization-admin-summary.interface';
-
-export interface OrganizationSummary {
-  id: string;
-  name: string;
-  isActive: boolean;
-  status: OrganizationStatus;
-  createdAt: Date;
-  meetingCount: number;
-  extractedItemCount: number;
-}
+import {
+  OrganizationFirstAdmin,
+  OrganizationSummary,
+} from './interfaces/organization-summary.interface';
 
 @Injectable()
 export class OrganizationsService {
@@ -47,8 +41,14 @@ export class OrganizationsService {
       order: { createdAt: 'ASC' },
     });
 
+    const firstAdminByOrgId = await this.loadFirstAdminsByOrganizationId(
+      organizations.map((org) => org.id),
+    );
+
     return Promise.all(
-      organizations.map(async (org) => this.toSummary(org)),
+      organizations.map((org) =>
+        this.toSummary(org, firstAdminByOrgId.get(org.id) ?? null),
+      ),
     );
   }
 
@@ -250,13 +250,21 @@ export class OrganizationsService {
     };
   }
 
-  private async toSummary(org: Organization): Promise<OrganizationSummary> {
+  private async toSummary(
+    org: Organization,
+    firstAdmin: OrganizationFirstAdmin | null | undefined = undefined,
+  ): Promise<OrganizationSummary> {
     const meetingCount = await this.meetingRepository.count({
       where: { organizationId: org.id },
     });
     const extractedItemCount = await this.extractedItemRepository.count({
       where: { organizationId: org.id },
     });
+
+    const resolvedFirstAdmin =
+      firstAdmin === undefined
+        ? await this.findFirstAdmin(org.id)
+        : firstAdmin;
 
     return {
       id: org.id,
@@ -266,6 +274,55 @@ export class OrganizationsService {
       createdAt: org.createdAt,
       meetingCount,
       extractedItemCount,
+      firstAdmin: resolvedFirstAdmin,
+    };
+  }
+
+  private async loadFirstAdminsByOrganizationId(
+    organizationIds: string[],
+  ): Promise<Map<string, OrganizationFirstAdmin>> {
+    if (organizationIds.length === 0) {
+      return new Map();
+    }
+
+    const admins = await this.userRepository.find({
+      where: organizationIds.map((organizationId) => ({
+        organizationId,
+        role: UserRole.Admin,
+      })),
+      order: { createdAt: 'ASC' },
+    });
+
+    const firstAdminByOrgId = new Map<string, OrganizationFirstAdmin>();
+    for (const admin of admins) {
+      if (!admin.organizationId || firstAdminByOrgId.has(admin.organizationId)) {
+        continue;
+      }
+
+      firstAdminByOrgId.set(admin.organizationId, {
+        name: admin.name,
+        email: admin.email,
+      });
+    }
+
+    return firstAdminByOrgId;
+  }
+
+  private async findFirstAdmin(
+    organizationId: string,
+  ): Promise<OrganizationFirstAdmin | null> {
+    const admin = await this.userRepository.findOne({
+      where: { organizationId, role: UserRole.Admin },
+      order: { createdAt: 'ASC' },
+    });
+
+    if (!admin) {
+      return null;
+    }
+
+    return {
+      name: admin.name,
+      email: admin.email,
     };
   }
 }

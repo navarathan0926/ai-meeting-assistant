@@ -71,6 +71,7 @@ jest.mock('@/providers/AuthProvider', () => ({
 }));
 
 import { useAuthContext } from '@/providers/AuthProvider';
+import { UserRole } from '@/types/auth';
 import {
   useExtractedItems,
   useApproveExtractedItem,
@@ -80,7 +81,7 @@ import {
 
 const mockedUseAuthContext = useAuthContext as jest.Mock;
 
-function mockAuthRole(role: 'USER' | 'ADMIN') {
+function mockAuthRole(role: UserRole) {
   mockedUseAuthContext.mockReturnValue({
     user: { id: 'user-1', name: 'Test', email: 'test@example.com', role },
     isAuthenticated: true,
@@ -135,7 +136,7 @@ function renderWithQuery(ui: React.ReactElement) {
 
 describe('ExtractedItemsReview', () => {
   beforeEach(() => {
-    mockAuthRole('ADMIN');
+    mockAuthRole(UserRole.Admin);
   });
 
   afterEach(() => {
@@ -271,7 +272,7 @@ describe('ExtractedItemsReview', () => {
   });
 
   it('should hide approve button for regular users', () => {
-    mockAuthRole('USER');
+    mockAuthRole(UserRole.User);
     mockedUseExtractedItems.mockReturnValue({
       data: [buildItem()],
       isLoading: false,

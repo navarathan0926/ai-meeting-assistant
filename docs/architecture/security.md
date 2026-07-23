@@ -34,7 +34,16 @@ in the `Authorization: Bearer <token>` header.
 ### Suspended users
 - Users have `isActive` (default `true`). Org ADMINs suspend/reactivate USER
   accounts via `/api/organizations/users/:id/suspend|reactivate`.
-- Suspended users cannot log in via password or Google (`403 Forbidden`).
+- Suspended users cannot log in via password or Google (`403` with code
+  `USER_SUSPENDED`). The client clears the session and redirects to login.
+
+### Suspended organizations
+- SUPERADMIN suspends tenants via `PATCH /api/organizations/:id/suspend`.
+- Users belonging to a suspended org cannot authenticate (`403` with code
+  `ORGANIZATION_SUSPENDED`).
+- Every JWT-protected request re-validates account and org status in
+  `AuthService.validateById` (via `JwtStrategy`), so existing tokens stop
+  working immediately after suspension.
 
 ### Token Expiry
 - JWT expiry is configured via `JWT_EXPIRY` env var (recommended: `7d` for

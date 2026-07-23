@@ -13,7 +13,7 @@ import { exchangeOAuthCode } from '@/lib/api/auth';
 import { getApiErrorCode, getUserFacingErrorMessage } from '@/lib/api/auth-errors';
 import { getDefaultAppPath } from '@/lib/auth-routes';
 import { GOOGLE_AUTH_URL } from '@/lib/auth-urls';
-import { AUTH_ERROR_CODES } from '@/types/auth';
+import { AUTH_ERROR_CODES, AuthLoginRedirectError } from '@/types/auth';
 
 const loginSchema = z.object({
   email: z.string().email('Enter a valid email address'),
@@ -48,13 +48,13 @@ function LoginForm() {
 
   useEffect(() => {
     const errorParam = searchParams.get('error');
-    if (errorParam === 'google_auth_failed') {
+    if (errorParam === AuthLoginRedirectError.GOOGLE_AUTH_FAILED) {
       setOauthError('Google sign-in was cancelled or failed. Please try again.');
       window.history.replaceState(null, '', '/login');
       return;
     }
 
-    if (errorParam === 'registration_disabled') {
+    if (errorParam === AuthLoginRedirectError.REGISTRATION_DISABLED) {
       setRegistrationDisabledMessage(
         'Public registration is disabled. Contact your organization admin for access.',
       );
@@ -62,8 +62,32 @@ function LoginForm() {
       return;
     }
 
+    if (errorParam === AuthLoginRedirectError.ORGANIZATION_SUSPENDED) {
+      setOauthError(
+        'Your organization has been suspended. Contact platform support.',
+      );
+      window.history.replaceState(null, '', '/login');
+      return;
+    }
+
+    if (errorParam === AuthLoginRedirectError.ORGANIZATION_REQUIRED) {
+      setOauthError(
+        'Your account is not assigned to an organization. Contact platform support.',
+      );
+      window.history.replaceState(null, '', '/login');
+      return;
+    }
+
+    if (errorParam === AuthLoginRedirectError.USER_SUSPENDED) {
+      setOauthError(
+        'This account has been suspended. Contact your organization admin.',
+      );
+      window.history.replaceState(null, '', '/login');
+      return;
+    }
+
     const messageParam = searchParams.get('message');
-    if (messageParam === 'registration_disabled') {
+    if (messageParam === AuthLoginRedirectError.REGISTRATION_DISABLED) {
       setRegistrationDisabledMessage(
         'Public registration is disabled. Contact your organization admin for access.',
       );

@@ -80,7 +80,25 @@ Org ADMINs may manage **USER** accounts in their org only:
 - Cannot create ADMIN accounts (SUPERADMIN only)
 - Delete is hard delete; user meetings cascade via FK
 
-Suspended users (`isActive: false`) cannot authenticate.
+Suspended users (`isActive: false`) cannot authenticate
+(`403` with code `USER_SUSPENDED`). The client clears the bearer token and
+redirects to login.
+
+## Organization suspension
+
+When a SUPERADMIN suspends an organization (`organizations.isActive = false`,
+`status = suspended`), **all users in that org** are blocked from:
+
+- Email/password login
+- Google OAuth login
+- JWT-protected API requests (re-validated on every request via `validateById`)
+
+SUPERADMIN accounts (`organizationId` is null) are exempt from org checks.
+
+Error code: `ORGANIZATION_SUSPENDED` (HTTP 403).
+
+User-level `isActive` flags are **not** bulk-updated on org suspend/reactivate;
+access is enforced by reading org status at auth time.
 
 ## Client alignment
 

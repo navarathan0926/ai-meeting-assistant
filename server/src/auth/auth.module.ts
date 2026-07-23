@@ -9,6 +9,7 @@ import { AuthService } from './auth.service';
 import { AuthOauthCodeService } from './auth-oauth-code.service';
 import { AuthController } from './auth.controller';
 import { User } from './entities/user.entity';
+import { Organization } from '../organizations/entities/organization.entity';
 import { JwtStrategy } from './strategies/jwt.strategy';
 import { GoogleStrategy } from './strategies/google.strategy';
 import { GoogleOauthGuard } from './guards/google-oauth.guard';
@@ -19,7 +20,7 @@ import { PlatformSettingsModule } from '../platform-settings/platform-settings.m
 
 @Module({
   imports: [
-    TypeOrmModule.forFeature([User]),
+    TypeOrmModule.forFeature([User, Organization]),
     PlatformSettingsModule,
     PassportModule.register({ defaultStrategy: 'jwt' }),
     JwtModule.registerAsync({
