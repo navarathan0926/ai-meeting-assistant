@@ -1,4 +1,14 @@
-export type OrganizationStatus = 'active' | 'suspended';
+import { UserRole } from '@/types/auth';
+
+export enum OrganizationStatus {
+  Active = 'active',
+  Suspended = 'suspended',
+}
+
+export interface OrganizationFirstAdmin {
+  name: string;
+  email: string;
+}
 
 export interface OrganizationSummary {
   id: string;
@@ -8,6 +18,7 @@ export interface OrganizationSummary {
   createdAt: string;
   meetingCount: number;
   extractedItemCount: number;
+  firstAdmin: OrganizationFirstAdmin | null;
 }
 
 export interface JiraConfig {
@@ -31,5 +42,31 @@ export interface CreateOrganizationAdminPayload {
   email: string;
   name: string;
   password: string;
-  role: 'ADMIN';
+  role: UserRole.Admin;
+}
+
+export interface OrganizationUserSummary {
+  id: string;
+  email: string;
+  name: string;
+  role: UserRole;
+  provider: 'local' | 'google';
+  isActive: boolean;
+  createdAt: string;
+}
+
+export interface OrganizationAdminSummary {
+  id: string;
+  email: string;
+  name: string;
+  role: UserRole.Admin;
+  provider: 'local' | 'google';
+  isActive: boolean;
+  createdAt: string;
+}
+
+export interface CreateOrganizationUserPayload {
+  email: string;
+  name: string;
+  password: string;
 }

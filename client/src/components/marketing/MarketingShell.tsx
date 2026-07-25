@@ -1,4 +1,5 @@
 import Link from 'next/link';
+import { MarketingAuthActions } from '@/components/marketing/MarketingAuthActions';
 
 const navLinks = [
   { href: '/features', label: 'Features' },
@@ -27,20 +28,7 @@ export function MarketingNav() {
           ))}
         </nav>
 
-        <div className="ml-auto flex items-center gap-3">
-          <Link
-            href="/login"
-            className="text-sm text-white/70 hover:text-white px-3 py-1.5 transition-colors"
-          >
-            Sign in
-          </Link>
-          <Link
-            href="/register"
-            className="text-sm bg-[#39FF14] text-black font-semibold px-4 py-2 rounded-lg hover:bg-[#32e612] transition-colors"
-          >
-            Get started
-          </Link>
-        </div>
+        <MarketingAuthActions />
       </div>
     </header>
   );

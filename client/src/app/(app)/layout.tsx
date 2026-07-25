@@ -1,8 +1,11 @@
 'use client';
 
 import { useEffect } from 'react';
-import { useRouter } from 'next/navigation';
+import { usePathname, useRouter } from 'next/navigation';
 import { AppShellProviders } from '@/components/providers/AppShellProviders';
+import { AppHeader } from '@/components/app/AppHeader';
+import { PlatformAdminHeader } from '@/components/app/PlatformAdminHeader';
+import { RoleGate } from '@/components/app/RoleGate';
 import { useAuthContext } from '@/providers/AuthProvider';
 
 function AppAuthGate({ children }: { children: React.ReactNode }) {
@@ -33,10 +36,26 @@ function AppAuthGate({ children }: { children: React.ReactNode }) {
   return <>{children}</>;
 }
 
+function AppChrome({ children }: { children: React.ReactNode }) {
+  const pathname = usePathname();
+  const isPlatformAdmin = pathname.startsWith('/superadmin');
+
+  return (
+    <div className="min-h-screen bg-[#09090f] text-white flex flex-col">
+      {isPlatformAdmin ? <PlatformAdminHeader /> : <AppHeader />}
+      {children}
+    </div>
+  );
+}
+
 export default function AppLayout({ children }: { children: React.ReactNode }) {
   return (
     <AppShellProviders>
-      <AppAuthGate>{children}</AppAuthGate>
+      <AppAuthGate>
+        <RoleGate>
+          <AppChrome>{children}</AppChrome>
+        </RoleGate>
+      </AppAuthGate>
     </AppShellProviders>
   );
 }

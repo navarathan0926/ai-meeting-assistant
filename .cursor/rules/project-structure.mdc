@@ -43,10 +43,16 @@ server/src/meetings/
 └── enums/         # domain enums when needed
 ```
 
-Existing features include `meetings/`, `transcriptions/`, `summaries/`, `auth/`, `storage/`, `extraction/`, `health/`, and `ai-agents/`.
+Existing features include `meetings/`, `transcriptions/`, `summaries/`, `auth/`, `storage/`, `extraction/`, `organizations/`, `organization-users/`, `health/`, and `ai-agents/`.
+
+## Enums
+
+- Domain literals used more than once (roles, statuses, error codes, integration auth types) belong in `enums/*.enum.ts` on the server and mirrored in `client/src/types/` on the client.
+- Prefer string enums whose values match the API/DB. Do not introduce a second parallel set of string constants for the same concept.
 
 ## Layer responsibilities
 
 - **Controllers** — routing and request validation only. No business logic.
 - **Services** — business logic. One responsibility per service; split when a service does more than one job.
-- **Shared API contracts** — server shapes in `dto/` and `interfaces/`; client shapes in `client/src/types/`. Do not duplicate or drift; keep field names aligned.
+- **Shared API contracts** — server shapes in `dto/` and `interfaces/`; client shapes in `client/src/types/`. Do not duplicate or drift; keep field names and enum values aligned.
+- **AuthZ** — enforce on the server; client role gates are navigation/UX only. See `docs/architecture/access-control.md` and `docs/architecture/security.md`.

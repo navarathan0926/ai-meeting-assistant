@@ -1,9 +1,6 @@
 'use client';
 
-import Link from 'next/link';
-import { useEffect, useState } from 'react';
-import { useRouter } from 'next/navigation';
-import { useAuthContext } from '@/providers/AuthProvider';
+import { useState } from 'react';
 import {
   useCreateOrganization,
   useCreateOrganizationAdmin,
@@ -11,11 +8,12 @@ import {
   useReactivateOrganization,
   useSuspendOrganization,
 } from '@/hooks/useOrganizations';
+import { OrganizationAdminsPanel } from '@/components/superadmin/OrganizationAdminsPanel';
+import { getUserFacingErrorMessage } from '@/lib/api/auth-errors';
 import { OrganizationSummary } from '@/types/organization';
+import { UserRole } from '@/types/auth';
 
 export default function SuperAdminPage() {
-  const router = useRouter();
-  const { user, logout } = useAuthContext();
   const { data: organizations, isLoading, isError, error } = useOrganizations();
   const createOrg = useCreateOrganization();
   const suspendOrg = useSuspendOrganization();
@@ -24,19 +22,10 @@ export default function SuperAdminPage() {
 
   const [newOrgName, setNewOrgName] = useState('');
   const [adminOrgId, setAdminOrgId] = useState<string | null>(null);
+  const [manageAdminsOrgId, setManageAdminsOrgId] = useState<string | null>(null);
   const [adminEmail, setAdminEmail] = useState('');
   const [adminName, setAdminName] = useState('');
   const [adminPassword, setAdminPassword] = useState('');
-
-  useEffect(() => {
-    if (user && user.role !== 'SUPERADMIN') {
-      router.replace('/dashboard');
-    }
-  }, [user, router]);
-
-  if (!user || user.role !== 'SUPERADMIN') {
-    return null;
-  }
 
   const busy =
     createOrg.isPending ||
@@ -60,12 +49,13 @@ export default function SuperAdminPage() {
           email: adminEmail.trim(),
           name: adminName.trim(),
           password: adminPassword,
-          role: 'ADMIN',
+          role: UserRole.Admin,
         },
       },
       {
         onSuccess: () => {
           setAdminOrgId(null);
+          setManageAdminsOrgId(organizationId);
           setAdminEmail('');
           setAdminName('');
           setAdminPassword('');
@@ -75,30 +65,8 @@ export default function SuperAdminPage() {
   };
 
   return (
-    <div className="min-h-screen bg-[#09090f] text-white flex flex-col">
-      <header className="sticky top-0 z-40 border-b border-white/8 px-6 py-4 flex items-center gap-3 bg-[#09090f]/95 backdrop-blur">
-        <Link href="/dashboard" className="flex items-center gap-3 hover:opacity-90">
-          <span className="text-2xl">🎙️</span>
-          <h1 className="font-bold text-lg tracking-tight">Platform Admin</h1>
-        </Link>
-        <div className="ml-auto flex items-center gap-4">
-          <span className="text-xs text-white/50 font-mono hidden sm:inline">
-            {user.name}
-            <span className="ml-2 rounded px-1.5 py-0.5 text-[10px] uppercase tracking-wide bg-amber-500/20 text-amber-200">
-              SUPERADMIN
-            </span>
-          </span>
-          <button
-            onClick={() => void logout()}
-            className="text-xs bg-white/5 hover:bg-white/10 text-white/80 hover:text-white px-3 py-1.5 rounded border border-white/10 transition-colors"
-          >
-            Sign out
-          </button>
-        </div>
-      </header>
-
-      <main className="flex-1 overflow-y-auto p-6 md:p-10">
-        <div className="max-w-5xl mx-auto flex flex-col gap-6">
+    <main className="flex-1 overflow-y-auto p-6 md:p-10">
+      <div className="max-w-5xl mx-auto flex flex-col gap-6">
           <div>
             <h2 className="text-xl font-semibold text-white/90">Organizations</h2>
             <p className="mt-1 text-sm text-white/45">
@@ -141,7 +109,7 @@ export default function SuperAdminPage() {
 
             {isError ? (
               <p className="text-sm text-red-200">
-                {error.message || 'Failed to load organizations.'}
+                {getUserFacingErrorMessage(error, 'Could not load organizations. Please try again.')}
               </p>
             ) : null}
 
@@ -168,10 +136,22 @@ export default function SuperAdminPage() {
                         org={org}
                         busy={busy}
                         adminOrgId={adminOrgId}
+                        manageAdminsOrgId={manageAdminsOrgId}
                         adminEmail={adminEmail}
                         adminName={adminName}
                         adminPassword={adminPassword}
-                        onToggleAdminForm={setAdminOrgId}
+                        onToggleAdminForm={(id) => {
+                          setAdminOrgId(id);
+                          if (id) {
+                            setManageAdminsOrgId(null);
+                          }
+                        }}
+                        onToggleManageAdmins={(id) => {
+                          setManageAdminsOrgId(id);
+                          if (id) {
+                            setAdminOrgId(null);
+                          }
+                        }}
                         onAdminEmailChange={setAdminEmail}
                         onAdminNameChange={setAdminName}
                         onAdminPasswordChange={setAdminPassword}
@@ -187,7 +167,6 @@ export default function SuperAdminPage() {
           </section>
         </div>
       </main>
-    </div>
   );
 }
 
@@ -195,10 +174,12 @@ function OrganizationRow({
   org,
   busy,
   adminOrgId,
+  manageAdminsOrgId,
   adminEmail,
   adminName,
   adminPassword,
   onToggleAdminForm,
+  onToggleManageAdmins,
   onAdminEmailChange,
   onAdminNameChange,
   onAdminPasswordChange,
@@ -209,10 +190,12 @@ function OrganizationRow({
   org: OrganizationSummary;
   busy: boolean;
   adminOrgId: string | null;
+  manageAdminsOrgId: string | null;
   adminEmail: string;
   adminName: string;
   adminPassword: string;
   onToggleAdminForm: (id: string | null) => void;
+  onToggleManageAdmins: (id: string | null) => void;
   onAdminEmailChange: (value: string) => void;
   onAdminNameChange: (value: string) => void;
   onAdminPasswordChange: (value: string) => void;
@@ -221,13 +204,22 @@ function OrganizationRow({
   onCreateAdmin: (organizationId: string) => void;
 }) {
   const showAdminForm = adminOrgId === org.id;
+  const showManageAdmins = manageAdminsOrgId === org.id;
 
   return (
     <>
       <tr className="border-b border-white/5 align-top">
         <td className="py-3 pr-4">
           <div className="font-medium text-white/90">{org.name}</div>
-          <div className="text-xs text-white/35 font-mono mt-1">{org.id}</div>
+          {org.firstAdmin ? (
+            <div className="text-xs text-white/45 mt-1">
+              {org.firstAdmin.name}
+              <span className="mx-1 text-white/25">·</span>
+              <span className="font-mono">{org.firstAdmin.email}</span>
+            </div>
+          ) : (
+            <div className="text-xs text-white/35 mt-1">No admin yet</div>
+          )}
         </td>
         <td className="py-3 pr-4">
           <span
@@ -266,6 +258,16 @@ function OrganizationRow({
             <button
               type="button"
               disabled={busy}
+              onClick={() =>
+                onToggleManageAdmins(showManageAdmins ? null : org.id)
+              }
+              className="rounded border border-white/15 px-2 py-1 text-xs text-white/80 hover:bg-white/10 disabled:opacity-50"
+            >
+              {showManageAdmins ? 'Hide admins' : 'Manage admins'}
+            </button>
+            <button
+              type="button"
+              disabled={busy}
               onClick={() => onToggleAdminForm(showAdminForm ? null : org.id)}
               className="rounded border border-white/15 px-2 py-1 text-xs text-white/80 hover:bg-white/10 disabled:opacity-50"
             >
@@ -274,14 +276,31 @@ function OrganizationRow({
           </div>
         </td>
       </tr>
+      {showManageAdmins ? (
+        <tr className="border-b border-white/10">
+          <td colSpan={5} className="py-3">
+            <div className="rounded-xl border border-white/10 bg-black/20 p-4">
+              <h4 className="mb-3 text-xs font-semibold uppercase tracking-wide text-white/50">
+                Organization admins
+              </h4>
+              <OrganizationAdminsPanel organizationId={org.id} disabled={busy} />
+            </div>
+          </td>
+        </tr>
+      ) : null}
       {showAdminForm ? (
         <tr className="border-b border-white/10">
           <td colSpan={5} className="py-3">
-            <div className="rounded-xl border border-white/10 bg-black/20 p-4 grid gap-3 md:grid-cols-3">
+            <form
+              className="rounded-xl border border-white/10 bg-black/20 p-4 grid gap-3 md:grid-cols-3"
+              autoComplete="off"
+              onSubmit={(event) => event.preventDefault()}
+            >
               <input
                 type="email"
                 value={adminEmail}
                 disabled={busy}
+                autoComplete="off"
                 onChange={(e) => onAdminEmailChange(e.target.value)}
                 placeholder="Admin email"
                 className="rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-sm text-white disabled:opacity-50"
@@ -290,6 +309,7 @@ function OrganizationRow({
                 type="text"
                 value={adminName}
                 disabled={busy}
+                autoComplete="off"
                 onChange={(e) => onAdminNameChange(e.target.value)}
                 placeholder="Admin name"
                 className="rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-sm text-white disabled:opacity-50"
@@ -298,6 +318,7 @@ function OrganizationRow({
                 type="password"
                 value={adminPassword}
                 disabled={busy}
+                autoComplete="new-password"
                 onChange={(e) => onAdminPasswordChange(e.target.value)}
                 placeholder="Temporary password"
                 className="rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-sm text-white disabled:opacity-50"
@@ -315,7 +336,7 @@ function OrganizationRow({
               >
                 Create admin user
               </button>
-            </div>
+            </form>
           </td>
         </tr>
       ) : null}

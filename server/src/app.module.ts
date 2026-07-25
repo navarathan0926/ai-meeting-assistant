@@ -11,6 +11,8 @@ import { ExtractionModule } from './extraction/extraction.module';
 import { AuthModule } from './auth/auth.module';
 import { ExtractedItemsModule } from './extracted-items/extracted-items.module';
 import { OrganizationsModule } from './organizations/organizations.module';
+import { OrganizationUsersModule } from './organization-users/organization-users.module';
+import { PlatformSettingsModule } from './platform-settings/platform-settings.module';
 import { RedisModule } from './common/redis/redis.module';
 import {
   configurations,
@@ -51,6 +53,8 @@ import { ConfigType } from '@nestjs/config';
     ExtractionModule,
     ExtractedItemsModule,
     OrganizationsModule,
+    OrganizationUsersModule,
+    PlatformSettingsModule,
     AuthModule,
   ],
   controllers: [HealthController],

@@ -27,6 +27,13 @@ Applies to `client/`.
 - HTTP calls belong in `client/src/lib/api/` (e.g. `meetings.api.ts`, `auth.ts`).
 - Use the shared axios instance from `client/src/lib/axios.ts`.
 
+## Enums and constants
+
+- Repeated domain strings (roles, statuses, auth error codes, redirect query values) belong in a **string enum** in `client/src/types/`, not inline literals.
+- Compare with `UserRole.Admin`, `MeetingStatus.Completed`, etc. — never `'ADMIN'` or `'COMPLETED'` scattered in pages/hooks.
+- Enum string values must match the server/API exactly. When the server adds a value, update the client enum in the same change when possible.
+- App-only constants that are not domain enums (e.g. localStorage keys) may be `export const` in the same types module.
+
 ## Layout (from README)
 
 ```

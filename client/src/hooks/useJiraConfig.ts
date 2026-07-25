@@ -2,9 +2,11 @@
 
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { organizationsApi } from '@/lib/api/organizations.api';
+import { getUserFacingErrorMessage } from '@/lib/api/auth-errors';
 import { JiraConfig, UpdateJiraConfigPayload } from '@/types/organization';
 import { useToast } from '@/providers/ToastProvider';
 import { useAuthContext } from '@/providers/AuthProvider';
+import { UserRole } from '@/types/auth';
 
 export const jiraConfigKeys = {
   all: (userId: string) => ['jira-config', userId] as const,
@@ -17,7 +19,7 @@ export function useJiraConfig() {
   return useQuery<JiraConfig, Error>({
     queryKey: jiraConfigKeys.all(userId),
     queryFn: () => organizationsApi.getJiraConfig(),
-    enabled: !!userId && user?.role === 'ADMIN',
+    enabled: !!userId && user?.role === UserRole.Admin,
   });
 }
 
@@ -35,7 +37,7 @@ export function useUpdateJiraConfig() {
       showToast('Jira credentials saved.', 'success');
     },
     onError: (err) => {
-      showToast(err.message || 'Failed to save Jira credentials.', 'error');
+      showToast(getUserFacingErrorMessage(err, 'Failed to save Jira credentials.'), 'error');
     },
   });
 }
@@ -49,7 +51,7 @@ export function useTestJiraConfig() {
       showToast('Jira credentials verified.', 'success');
     },
     onError: (err) => {
-      showToast(err.message || 'Jira credential test failed.', 'error');
+      showToast(getUserFacingErrorMessage(err, 'Jira credential test failed.'), 'error');
     },
   });
 }

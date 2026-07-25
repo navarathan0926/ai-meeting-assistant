@@ -2,6 +2,7 @@
 
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { jiraApi } from '@/lib/api/jira.api';
+import { getUserFacingErrorMessage } from '@/lib/api/auth-errors';
 import { JiraProject } from '@/types/jira-project';
 import { useToast } from '@/providers/ToastProvider';
 import { useAuthContext } from '@/providers/AuthProvider';
@@ -43,7 +44,7 @@ export function useUpdateProjectContext() {
       showToast(`Saved AI context for ${updated.key}.`, 'success');
     },
     onError: (err) => {
-      showToast(err.message || 'Failed to save project context.', 'error');
+      showToast(getUserFacingErrorMessage(err, 'Failed to save project context.'), 'error');
     },
   });
 }

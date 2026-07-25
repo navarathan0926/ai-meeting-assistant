@@ -18,6 +18,7 @@ const TEST_USER: User = {
   googleId: null,
   role: UserRole.User,
   organizationId: DEFAULT_ORGANIZATION_ID,
+  isActive: true,
   meetings: [],
   createdAt: new Date(),
   updatedAt: new Date(),

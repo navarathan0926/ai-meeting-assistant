@@ -117,11 +117,11 @@ loads them only when making Jira API calls for that org.
 
 **API surface for org ADMIN settings:**
 
-- `GET /api/organizations/me/jira-config` — returns cloud id, account id,
+- `GET /api/organizations/jira-config` — returns cloud id, account id,
   email, `configured: boolean`; **no** API token.
-- `PUT /api/organizations/me/jira-config` — ADMIN only; accepts cloud id,
+- `PUT /api/organizations/jira-config` — ADMIN only; accepts cloud id,
   email, and optional new API token; verifies, encrypts, and saves.
-- `POST /api/organizations/me/jira-config/test` (optional) — verifies
+- `POST /api/organizations/jira-config/test` (optional) — verifies
   credentials against Jira before persisting.
 
 **Migration from env-based Jira (Phases 8–9):**

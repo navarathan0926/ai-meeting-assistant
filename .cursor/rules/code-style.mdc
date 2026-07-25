@@ -22,6 +22,7 @@ alwaysApply: true
 - Favor readability over cleverness.
 - Avoid one-liners that sacrifice clarity.
 - Match existing conventions in the file or module before introducing new patterns.
+- Prefer **enums** (or named consts) over repeated magic strings/numbers; see naming + Nest/Next conventions.
 
 ## NestJS (`server/`)
 

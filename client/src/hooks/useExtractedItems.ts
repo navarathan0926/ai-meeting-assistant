@@ -3,6 +3,7 @@
 import { useEffect, useRef } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { extractedItemsApi } from '@/lib/api/extracted-items.api';
+import { getUserFacingErrorMessage } from '@/lib/api/auth-errors';
 import {
   ApproveExtractedItemResult,
   ExtractedItem,
@@ -97,7 +98,7 @@ export function useUpdateExtractedItem(meetingId: string) {
       showToast('Item updated.', 'success');
     },
     onError: (err) => {
-      showToast(err.message || 'Failed to update item.', 'error');
+      showToast(getUserFacingErrorMessage(err, 'Failed to update item.'), 'error');
     },
   });
 }
@@ -118,7 +119,7 @@ export function useRejectExtractedItem(meetingId: string) {
       showToast('Item rejected.', 'success');
     },
     onError: (err) => {
-      showToast(err.message || 'Failed to reject item.', 'error');
+      showToast(getUserFacingErrorMessage(err, 'Failed to reject item.'), 'error');
     },
   });
 }
@@ -154,7 +155,7 @@ export function useApproveExtractedItem(meetingId: string) {
       showToast('Item approved.', 'success');
     },
     onError: (err) => {
-      showToast(err.message || 'Failed to approve item.', 'error');
+      showToast(getUserFacingErrorMessage(err, 'Failed to approve item.'), 'error');
     },
   });
 }

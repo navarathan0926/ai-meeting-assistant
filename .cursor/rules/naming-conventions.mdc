@@ -20,6 +20,22 @@ Use the feature prefix in every filename:
 
 Avoid generic names like `helper.ts`, `utils.ts`, or `misc.ts` without a clear feature prefix.
 
+### Enums (`server/`)
+
+- File: `enums/<feature-or-domain>.enum.ts` (e.g. `user-role.enum.ts`, `meeting-status.enum.ts`).
+- Use a **string enum** when the same literal appears in more than one place (roles, statuses, error codes, auth types, redirect query values).
+- Prefer `PascalCase` enum members with **string values** that match the API/DB contract:
+
+```typescript
+export enum UserRole {
+  User = 'USER',
+  Admin = 'ADMIN',
+  SuperAdmin = 'SUPERADMIN',
+}
+```
+
+- Do **not** scatter magic strings like `'SUPERADMIN'` or `'PENDING'` across services/controllers.
+
 ## Next.js (`client/`)
 
 - **Components** — PascalCase filenames, one component per file (e.g. `MeetingHistory.tsx`).
@@ -27,8 +43,15 @@ Avoid generic names like `helper.ts`, `utils.ts`, or `misc.ts` without a clear f
 - **Pages/routes** — App Router conventions under `client/src/app/`.
 - **API clients** — `client/src/lib/api/*.api.ts` (e.g. `meetings.api.ts`).
 
+### Enums (`client/`)
+
+- Colocate domain enums in `client/src/types/` next to the related interfaces (e.g. `auth.ts`, `meeting.ts`).
+- Mirror server enum **member names and string values** exactly; do not invent parallel string unions for the same concept.
+- Use the enum everywhere comparisons, switches, route gates, and UI labels need that value — never re-type the literal.
+
 ## Cross-app types
 
 - **Server** — request/response shapes in the matching feature's `dto/` or `interfaces/`.
 - **Client** — UI and API consumer types in `client/src/types/`.
 - When both sides need the same contract, keep definitions aligned; do not copy-paste divergent versions.
+- Shared domain values (roles, statuses, error codes) must be enums on **both** sides with identical string values.

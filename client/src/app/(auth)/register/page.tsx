@@ -1,16 +1,18 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import { useRouter } from 'next/navigation';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import Link from 'next/link';
-import { useRouter } from 'next/navigation';
 import { useRegister } from '@/hooks/useAuth';
 import { useAuthContext } from '@/providers/AuthProvider';
-import { getApiErrorCode, getApiErrorMessage } from '@/lib/api/auth-errors';
+import { fetchAuthConfig } from '@/lib/api/auth';
+import { getApiErrorCode, getUserFacingErrorMessage } from '@/lib/api/auth-errors';
 import { GOOGLE_AUTH_URL } from '@/lib/auth-urls';
-import { AUTH_ERROR_CODES } from '@/types/auth';
+import { getDefaultAppPath } from '@/lib/auth-routes';
+import { AUTH_ERROR_CODES, AuthLoginRedirectError } from '@/types/auth';
 
 // ─── Schema ───────────────────────────────────────────────────────────────────
 
@@ -69,17 +71,61 @@ function GoogleIcon() {
 
 export default function RegisterPage() {
   const router = useRouter();
-  const { isAuthenticated, isLoading } = useAuthContext();
+  const { isAuthenticated, isLoading, user } = useAuthContext();
   const { mutate: registerMutate, isPending, error } = useRegister();
+  const [isConfigLoading, setIsConfigLoading] = useState(true);
+  const [signupAllowed, setSignupAllowed] = useState(true);
   const [showPassword, setShowPassword] = useState(false);
   const [password, setPassword] = useState('');
   const [highlightGoogle, setHighlightGoogle] = useState(false);
 
   useEffect(() => {
-    if (!isLoading && isAuthenticated) {
-      router.replace('/dashboard');
+    if (!isLoading && isAuthenticated && user) {
+      router.replace(getDefaultAppPath(user.role));
     }
-  }, [isAuthenticated, isLoading, router]);
+  }, [isAuthenticated, isLoading, router, user]);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    fetchAuthConfig()
+      .then((config) => {
+        if (cancelled) {
+          return;
+        }
+        setSignupAllowed(config.allowPublicSignup);
+        if (!config.allowPublicSignup) {
+          router.replace(
+            `/login?message=${AuthLoginRedirectError.REGISTRATION_DISABLED}`,
+          );
+        }
+      })
+      .catch(() => {
+        if (!cancelled) {
+          setSignupAllowed(false);
+          router.replace(
+            `/login?message=${AuthLoginRedirectError.REGISTRATION_DISABLED}`,
+          );
+        }
+      })
+      .finally(() => {
+        if (!cancelled) {
+          setIsConfigLoading(false);
+        }
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [router]);
+
+  if (isConfigLoading || !signupAllowed) {
+    return (
+      <div className="auth-card flex flex-col items-center justify-center py-12">
+        <span className="btn-spinner" />
+      </div>
+    );
+  }
 
   const strength = getStrength(password);
 
@@ -109,8 +155,7 @@ export default function RegisterPage() {
   };
 
   const apiError =
-    getApiErrorMessage(error) ??
-    (error ? 'Registration failed. Please try again.' : null);
+    error ? getUserFacingErrorMessage(error, 'Registration failed. Please try again.') : null;
 
   return (
     <div className="auth-card">

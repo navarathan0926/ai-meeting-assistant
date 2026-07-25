@@ -1,5 +1,5 @@
-import Link from 'next/link';
 import { MarketingFooter, MarketingNav } from '@/components/marketing/MarketingShell';
+import { LandingHeroActions } from '@/components/marketing/LandingHeroActions';
 
 export default function LandingPage() {
   return (
@@ -19,20 +19,7 @@ export default function LandingPage() {
               Upload recordings, get transcripts and summaries, then review and
               approve structured Jira drafts before they land in your backlog.
             </p>
-            <div className="flex flex-wrap gap-4">
-              <Link
-                href="/register"
-                className="bg-[#39FF14] text-black font-semibold px-6 py-3 rounded-lg hover:bg-[#32e612] transition-colors"
-              >
-                Start free
-              </Link>
-              <Link
-                href="/features"
-                className="border border-white/15 text-white px-6 py-3 rounded-lg hover:bg-white/5 transition-colors"
-              >
-                See features
-              </Link>
-            </div>
+            <LandingHeroActions />
           </div>
         </section>
 

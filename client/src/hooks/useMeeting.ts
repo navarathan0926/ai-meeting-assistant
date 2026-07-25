@@ -2,6 +2,7 @@
 
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { meetingsApi } from '@/lib/api/meetings.api';
+import { getUserFacingErrorMessage } from '@/lib/api/auth-errors';
 import { Meeting, MeetingStatus } from '@/types/meeting';
 import { useToast } from '@/providers/ToastProvider';
 import { useAuthContext } from '@/providers/AuthProvider';
@@ -87,7 +88,7 @@ export function useDeleteMeeting(onSuccess?: (id: string) => void) {
       onSuccess?.(id);
     },
     onError: (err) => {
-      showToast(err.message || 'Failed to delete meeting.', 'error');
+      showToast(getUserFacingErrorMessage(err, 'Failed to delete meeting.'), 'error');
     },
   });
 }
