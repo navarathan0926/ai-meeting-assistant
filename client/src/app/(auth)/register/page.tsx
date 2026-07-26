@@ -8,7 +8,7 @@ import { z } from 'zod';
 import Link from 'next/link';
 import { useRegister } from '@/hooks/useAuth';
 import { useAuthContext } from '@/providers/AuthProvider';
-import { fetchAuthConfig } from '@/lib/api/auth';
+import { useAuthConfig } from '@/hooks/useAuthConfig';
 import { getApiErrorCode, getUserFacingErrorMessage } from '@/lib/api/auth-errors';
 import { GOOGLE_AUTH_URL } from '@/lib/auth-urls';
 import { getDefaultAppPath } from '@/lib/auth-routes';
@@ -73,61 +73,14 @@ export default function RegisterPage() {
   const router = useRouter();
   const { isAuthenticated, isLoading, user } = useAuthContext();
   const { mutate: registerMutate, isPending, error } = useRegister();
-  const [isConfigLoading, setIsConfigLoading] = useState(true);
-  const [signupAllowed, setSignupAllowed] = useState(true);
+  const {
+    data: authConfig,
+    isLoading: isConfigLoading,
+    isError: isConfigError,
+  } = useAuthConfig();
   const [showPassword, setShowPassword] = useState(false);
   const [password, setPassword] = useState('');
   const [highlightGoogle, setHighlightGoogle] = useState(false);
-
-  useEffect(() => {
-    if (!isLoading && isAuthenticated && user) {
-      router.replace(getDefaultAppPath(user.role));
-    }
-  }, [isAuthenticated, isLoading, router, user]);
-
-  useEffect(() => {
-    let cancelled = false;
-
-    fetchAuthConfig()
-      .then((config) => {
-        if (cancelled) {
-          return;
-        }
-        setSignupAllowed(config.allowPublicSignup);
-        if (!config.allowPublicSignup) {
-          router.replace(
-            `/login?message=${AuthLoginRedirectError.REGISTRATION_DISABLED}`,
-          );
-        }
-      })
-      .catch(() => {
-        if (!cancelled) {
-          setSignupAllowed(false);
-          router.replace(
-            `/login?message=${AuthLoginRedirectError.REGISTRATION_DISABLED}`,
-          );
-        }
-      })
-      .finally(() => {
-        if (!cancelled) {
-          setIsConfigLoading(false);
-        }
-      });
-
-    return () => {
-      cancelled = true;
-    };
-  }, [router]);
-
-  if (isConfigLoading || !signupAllowed) {
-    return (
-      <div className="auth-card flex flex-col items-center justify-center py-12">
-        <span className="btn-spinner" />
-      </div>
-    );
-  }
-
-  const strength = getStrength(password);
 
   const {
     register,
@@ -136,6 +89,29 @@ export default function RegisterPage() {
   } = useForm<RegisterFormValues>({
     resolver: zodResolver(registerSchema),
   });
+
+  useEffect(() => {
+    if (!isLoading && isAuthenticated && user) {
+      router.replace(getDefaultAppPath(user.role));
+    }
+  }, [isAuthenticated, isLoading, router, user]);
+
+  useEffect(() => {
+    if (isConfigLoading) {
+      return;
+    }
+
+    if (isConfigError || !authConfig?.allowPublicSignup) {
+      router.replace(
+        `/login?message=${AuthLoginRedirectError.REGISTRATION_DISABLED}`,
+      );
+    }
+  }, [authConfig, isConfigError, isConfigLoading, router]);
+
+  const signupAllowed = authConfig?.allowPublicSignup === true;
+  const showForm = !isConfigLoading && signupAllowed;
+
+  const strength = getStrength(password);
 
   const onSubmit = (data: RegisterFormValues) => {
     setHighlightGoogle(false);
@@ -156,6 +132,14 @@ export default function RegisterPage() {
 
   const apiError =
     error ? getUserFacingErrorMessage(error, 'Registration failed. Please try again.') : null;
+
+  if (!showForm) {
+    return (
+      <div className="auth-card flex flex-col items-center justify-center py-12">
+        <span className="btn-spinner" />
+      </div>
+    );
+  }
 
   return (
     <div className="auth-card">
