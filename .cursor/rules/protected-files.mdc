@@ -1,0 +1,31 @@
+---
+description: Never modify, overwrite, or delete files inside .cursor/ or any environment config files
+alwaysApply: true
+---
+
+# Protected Files — Do Not Touch
+
+## Absolute prohibitions
+
+Never **delete**, **overwrite**, **move**, or **modify** any file in these paths:
+
+| Protected path | Examples |
+|---|---|
+| `.cursor/` and all children | `.cursor/mcp.json`, `.cursor/rules/*.mdc` |
+| All `.env*` files **except** `.env.example` | `.env`, `.env.local`, `.env.development`, `.env.production`, `.env.staging`, `.env.test` |
+
+## Rules
+
+- Do **not** run `rm`, `del`, `Remove-Item`, or any shell command that targets these paths.
+- Do **not** overwrite them with `Write`, `StrReplace`, or redirect output (e.g. `echo … > .env.production`).
+- Do **not** suggest or execute `git clean`, `git checkout`, or `git reset` if it would touch these files.
+- Do **not** scaffold or regenerate these files even if they appear to be missing — ask the user instead.
+- `.env.example` **is allowed** to be created or modified — it is a public template with no real secrets and serves as the reference for what keys belong in the real env files.
+
+## If a task seems to require touching a protected file
+
+Stop and ask the user for explicit permission before proceeding. Explain what change is needed and why.
+
+## Rationale
+
+The real `.env*` files contain environment secrets and are environment-specific — they cannot be regenerated automatically. `.cursor/` holds MCP server configuration and AI guidance rules. Accidental deletion or overwrite of any of these causes data loss that is difficult or impossible to recover. `.env.example` is intentionally excluded because it is a public, secret-free template that documents which keys are required.
