@@ -1,0 +1,32 @@
+{
+  "name": "ai-meeting-assistent",
+  "version": "1.0.0",
+  "description": "An AI-powered meeting assistant that transcribes audio recordings, generates\r smart summaries using OpenAI APIs, extracts actionable items, and pushes them\r to external task managers (Jira, Linear, GitHub Issues).",
+  "main": "index.js",
+  "directories": {
+    "doc": "docs"
+  },
+  "scripts": {
+    "test:e2e": "playwright test",
+    "test:e2e:ui": "playwright test --ui",
+    "test:e2e:headed": "playwright test --headed",
+    "test:e2e:report": "playwright show-report"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/navarathan0926/ai-meeting-assistant.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs",
+  "bugs": {
+    "url": "https://github.com/navarathan0926/ai-meeting-assistant/issues"
+  },
+  "homepage": "https://github.com/navarathan0926/ai-meeting-assistant#readme",
+  "devDependencies": {
+    "@playwright/test": "^1.61.1",
+    "@types/node": "^26.1.1",
+    "dotenv": "^16.4.7"
+  }
+}
